@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
@@ -15,7 +16,7 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <html lang="en">
