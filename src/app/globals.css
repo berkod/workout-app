@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fall-cream: #FFF8F0;
+  --color-fall-wheat: #F5E6D3;
+  --color-fall-copper: #B87333;
+  --color-fall-rust: #C1440E;
+  --color-fall-amber: #D4A017;
+  --color-fall-olive: #606C38;
+  --color-fall-bark: #3E2723;
+  --color-fall-bark-light: #5D4037;
+}
+
+body {
+  background-color: var(--color-fall-cream);
+  color: var(--color-fall-bark);
+}
