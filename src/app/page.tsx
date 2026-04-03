@@ -9,7 +9,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/routines')
+    fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/routines`)
       .then((res) => res.json())
       .then((data) => {
         setRoutines(data)

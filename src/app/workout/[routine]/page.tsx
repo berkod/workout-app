@@ -16,7 +16,7 @@ export default function WorkoutPage() {
   const [completing, setCompleting] = useState(false)
 
   useEffect(() => {
-    fetch(`/api/workout/${encodeURIComponent(routineName)}`)
+    fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/workout/${encodeURIComponent(routineName)}`)
       .then((res) => res.json())
       .then((data: WorkoutData) => {
         setWorkout(data)
@@ -46,7 +46,7 @@ export default function WorkoutPage() {
 
   const handleUpdate = useCallback(
     async (rowIndex: number, column: EditableColumn, value: string) => {
-      await fetch('/api/sets', {
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/sets`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rowIndex, column, value }),
@@ -97,7 +97,7 @@ export default function WorkoutPage() {
 
   async function handleComplete() {
     setCompleting(true)
-    await fetch('/api/complete', {
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ routine: routineName }),
