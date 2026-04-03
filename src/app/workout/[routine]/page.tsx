@@ -14,6 +14,7 @@ export default function WorkoutPage() {
   const [workout, setWorkout] = useState<WorkoutData | null>(null)
   const [openSections, setOpenSections] = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState(false)
+  const [showDeloadPrompt, setShowDeloadPrompt] = useState(false)
 
   useEffect(() => {
     fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/workout/${encodeURIComponent(routineName)}`)
@@ -97,10 +98,25 @@ export default function WorkoutPage() {
 
   async function handleComplete() {
     setCompleting(true)
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/complete`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ routine: routineName }),
+    })
+    const data = await res.json()
+    if (data.deloadPrompt) {
+      setCompleting(false)
+      setShowDeloadPrompt(true)
+    } else {
+      router.push('/')
+    }
+  }
+
+  async function handleDeloadChoice(choice: 'deload' | 'skip') {
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/advance-week`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ choice }),
     })
     router.push('/')
   }
@@ -129,6 +145,31 @@ export default function WorkoutPage() {
       </div>
 
       <CompleteButton onComplete={handleComplete} loading={completing} />
+
+      {showDeloadPrompt && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-6 z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <h2 className="text-lg font-bold text-fall-rust mb-2">3 Weeks Complete</h2>
+            <p className="text-sm text-fall-bark-light mb-6">
+              You&apos;ve finished a full cycle. Would you like to do a deload week before starting the next cycle?
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => handleDeloadChoice('deload')}
+                className="w-full py-3 rounded-xl bg-fall-rust text-white font-semibold text-sm"
+              >
+                Do Deload Week
+              </button>
+              <button
+                onClick={() => handleDeloadChoice('skip')}
+                className="w-full py-3 rounded-xl border border-fall-rust text-fall-rust font-semibold text-sm"
+              >
+                Skip — Start Next Cycle
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

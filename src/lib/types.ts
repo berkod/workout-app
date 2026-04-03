@@ -16,13 +16,26 @@ export interface RoutineSummary {
 
 export interface SetGroup {
   setType: string
-  exercise: string
+  exercise: string      // lowercase canonical
+  displayName: string   // human-readable label for UI
   sets: SheetRow[]
 }
 
 export interface WorkoutData {
   routine: string
   groups: SetGroup[]
+}
+
+export interface ExerciseConfig {
+  exercise: string       // lowercase canonical key
+  humanReadable: string  // display name from Config col E
+  trainingMax: number
+  increment: number
+  type: 'main' | 'accessory'
+}
+
+export interface WorkoutState {
+  currentWeek: number  // 1=week1, 2=week2, 3=week3, 4=deload
 }
 
 export type EditableColumn = 'targetReps' | 'targetWeight' | 'actualReps'

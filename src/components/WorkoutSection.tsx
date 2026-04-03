@@ -31,7 +31,7 @@ export function WorkoutSection({
             {group.setType}
           </span>
           <span className="ml-2 text-sm font-medium text-fall-bark">
-            {group.exercise}
+            {group.displayName}
           </span>
         </div>
         <div className="flex items-center gap-2">
