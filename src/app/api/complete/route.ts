@@ -34,7 +34,7 @@ export async function POST(request: Request) {
         .filter((r) => {
           const key = r.exercise.toLowerCase()
           const config = exerciseConfigs.get(`${key}::accessory`) ?? exerciseConfigs.get(key)
-          return config?.type === 'accessory'
+          return config?.type === 'accessory' // bodyweight excluded — nothing to increment
         })
         .map((r) => r.exercise.toLowerCase())
     ),

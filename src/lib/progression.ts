@@ -79,8 +79,8 @@ export const WEEK_SPEC: Record<Week, WeekSpec> = {
   },
 }
 
-export function roundToFive(weight: number): number {
-  return Math.round(weight / 5) * 5
+export function roundToNearest(weight: number, increment = 2.5): number {
+  return Math.round(weight / increment) * increment
 }
 
 /**
@@ -111,7 +111,8 @@ export function generateWorkoutRows(
   }
 
   for (const { setType, exercise } of pairs) {
-    const isAccessorySet = setType === 'Accessory'
+    const setTypeLower = setType.toLowerCase()
+    const isAccessorySet = setTypeLower === 'accessory'
     const key = exercise.toLowerCase()
     const config =
       exerciseConfigs.get(`${key}::${isAccessorySet ? 'accessory' : 'main'}`) ??
@@ -120,32 +121,33 @@ export function generateWorkoutRows(
 
     const base = { date: '', routine, exercise, actualReps: '' }
 
-    if (setType === 'Warm-Up' && config.type === 'main') {
+    if (setTypeLower === 'warm-up' && config.type === 'main') {
       for (const s of spec.warmup) {
-        result.push({ ...base, setType, targetReps: s.reps, targetWeight: String(roundToFive(config.trainingMax * s.pct)) })
+        result.push({ ...base, setType, targetReps: s.reps, targetWeight: String(roundToNearest(config.trainingMax * s.pct, config.roundTo)) })
       }
-    } else if (setType === 'Main' && config.type === 'main') {
+    } else if (setTypeLower === 'main' && config.type === 'main') {
       for (const s of spec.main) {
-        result.push({ ...base, setType, targetReps: s.reps, targetWeight: String(roundToFive(config.trainingMax * s.pct)) })
+        result.push({ ...base, setType, targetReps: s.reps, targetWeight: String(roundToNearest(config.trainingMax * s.pct, config.roundTo)) })
       }
-    } else if (setType === 'FSL' && config.type === 'main') {
+    } else if (setTypeLower === 'fsl' && config.type === 'main') {
       if (spec.fslSets === 0) continue // skip FSL on deload
-      const fslWeight = roundToFive(config.trainingMax * spec.fslPct)
+      const fslWeight = roundToNearest(config.trainingMax * spec.fslPct, config.roundTo)
       for (let i = 0; i < spec.fslSets; i++) {
         result.push({ ...base, setType, targetReps: spec.fslReps, targetWeight: String(fslWeight) })
       }
-    } else if (setType === 'Accessory') {
+    } else if (isAccessorySet) {
       // Derive set count and reps from most recent completed occurrence
       const historicalSets = allHistoricalRows.filter(
-        (r) => r.setType === 'Accessory' && r.exercise === exercise && r.date !== ''
+        (r) => r.setType.toLowerCase() === 'accessory' && r.exercise === exercise && r.date !== ''
       )
       const latestDate = historicalSets.reduce((max, r) => (r.date > max ? r.date : max), '')
       const latestSets = historicalSets.filter((r) => r.date === latestDate)
       const numSets = latestSets.length || 1
       const reps = latestSets[0]?.targetReps ?? '10'
+      const weight = config.type === 'bodyweight' ? 'BW' : String(config.trainingMax)
 
       for (let i = 0; i < numSets; i++) {
-        result.push({ ...base, setType, targetReps: reps, targetWeight: String(config.trainingMax) })
+        result.push({ ...base, setType, targetReps: reps, targetWeight: weight })
       }
     }
   }

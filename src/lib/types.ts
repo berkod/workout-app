@@ -31,7 +31,8 @@ export interface ExerciseConfig {
   humanReadable: string  // display name from Config col E
   trainingMax: number
   increment: number
-  type: 'main' | 'accessory'
+  type: 'main' | 'accessory' | 'bodyweight'
+  roundTo: number        // rounding increment for weight calculations, default 2.5
 }
 
 export interface WorkoutState {

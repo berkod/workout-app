@@ -12,7 +12,7 @@ function buildWorkoutData(
   for (const row of rows) {
     let group = groups.find((g) => g.setType === row.setType && g.exercise === row.exercise)
     if (!group) {
-      const isAccessory = row.setType === 'Accessory'
+      const isAccessory = row.setType.toLowerCase() === 'accessory'
       const key = row.exercise.toLowerCase()
       const config =
         exerciseConfigs.get(`${key}::${isAccessory ? 'accessory' : 'main'}`) ??

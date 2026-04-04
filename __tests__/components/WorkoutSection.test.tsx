@@ -1,3 +1,4 @@
+'use client'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -6,21 +7,22 @@ import type { SetGroup } from '@/lib/types'
 
 const group: SetGroup = {
   setType: 'warm-up',
-  exercise: 'Overhead Press',
+  exercise: 'barbell_press',
+  displayName: 'Barbell Press',
   sets: [
-    { rowIndex: 2, date: '', routine: 'Day 1', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '45', actualReps: '' },
-    { rowIndex: 3, date: '', routine: 'Day 1', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '65', actualReps: '' },
+    { rowIndex: 2, date: '', routine: 'Day 1', setType: 'warm-up', exercise: 'barbell_press', targetReps: '5', targetWeight: '45', actualReps: '' },
+    { rowIndex: 3, date: '', routine: 'Day 1', setType: 'warm-up', exercise: 'barbell_press', targetReps: '5', targetWeight: '65', actualReps: '' },
   ],
 }
 
 describe('WorkoutSection', () => {
-  it('displays set type and exercise in header', () => {
+  it('displays set type and displayName in header', () => {
     render(
       <WorkoutSection group={group} isOpen={false} onToggle={vi.fn()} onUpdate={vi.fn()} />
     )
 
     expect(screen.getByText('warm-up')).toBeInTheDocument()
-    expect(screen.getByText('Overhead Press')).toBeInTheDocument()
+    expect(screen.getByText('Barbell Press')).toBeInTheDocument()
   })
 
   it('shows sets when open', () => {
@@ -28,7 +30,9 @@ describe('WorkoutSection', () => {
       <WorkoutSection group={group} isOpen={true} onToggle={vi.fn()} onUpdate={vi.fn()} />
     )
 
-    expect(screen.getAllByText('Overhead Press')).toHaveLength(3) // header + 2 rows
+    // header + 2 set rows each showing the weight
+    expect(screen.getByText('45')).toBeInTheDocument()
+    expect(screen.getByText('65')).toBeInTheDocument()
   })
 
   it('hides sets when collapsed', () => {
@@ -36,10 +40,8 @@ describe('WorkoutSection', () => {
       <WorkoutSection group={group} isOpen={false} onToggle={vi.fn()} onUpdate={vi.fn()} />
     )
 
-    // Header still visible
     expect(screen.getByText('warm-up')).toBeInTheDocument()
-    // Only the header exercise text, not the rows
-    expect(screen.getAllByText('Overhead Press')).toHaveLength(1)
+    expect(screen.queryByText('45')).not.toBeInTheDocument()
   })
 
   it('calls onToggle when header is clicked', async () => {

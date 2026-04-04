@@ -54,7 +54,7 @@ export async function getExerciseConfig(): Promise<Map<string, ExerciseConfig>> 
   const sheets = getSheets()
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Config!A:E',
+    range: 'Config!A:F',
   })
   const values = response.data.values
   if (!values || values.length <= 1) return new Map()
@@ -63,16 +63,19 @@ export async function getExerciseConfig(): Promise<Map<string, ExerciseConfig>> 
   for (const row of values.slice(1)) {
     if (!row[0]) continue
     const exercise = row[0].toLowerCase()
-    const type = (row[3] === 'main' ? 'main' : 'accessory') as 'main' | 'accessory'
+    const type = (['main', 'accessory', 'bodyweight'].includes(row[3]) ? row[3] : 'accessory') as 'main' | 'accessory' | 'bodyweight'
     const config: ExerciseConfig = {
       exercise,
       humanReadable: row[4] || row[0], // fall back to raw value if col E is empty
       trainingMax: Number(row[1]) || 0,
       increment: Number(row[2]) || 5,
       type,
+      roundTo: Number(row[5]) || 2.5,
     }
     // Compound key: exercise (lowercase) + type
-    map.set(`${exercise}::${type}`, config)
+    // bodyweight exercises use 'accessory' in the compound key since they appear as accessories in workouts
+    const compoundType = type === 'bodyweight' ? 'accessory' : type
+    map.set(`${exercise}::${compoundType}`, config)
     // Plain-name fallback for single-role exercises (last write wins)
     if (!map.has(exercise)) map.set(exercise, config)
   }
