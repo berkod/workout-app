@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../src/**/*.{ts,tsx}";
 
 @theme {
   --color-fall-cream: #FFF8F0;

@@ -37,7 +37,8 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Main navigation"
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-fall-wheat bg-fall-cream"
+      style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50 }}
+      className="border-t border-fall-wheat bg-fall-cream"
     >
       <ul role="list" className="mx-auto flex max-w-md">
         {tabs.map((tab) => (
