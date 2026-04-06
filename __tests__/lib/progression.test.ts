@@ -227,7 +227,7 @@ describe('generateWorkoutRows — edge cases', () => {
 
   it('handles dual-role exercise: main vs accessory use separate configs', () => {
     const mainConfig = makeConfig('barbell_press', 165, 'main', 5)
-    const accConfig: ExerciseConfig = { exercise: 'barbell_press', humanReadable: 'Barbell Press (Light)', trainingMax: 95, increment: 5, type: 'accessory' }
+    const accConfig: ExerciseConfig = { exercise: 'barbell_press', humanReadable: 'Barbell Press (Light)', trainingMax: 95, increment: 5, type: 'accessory', roundTo: 2.5 }
     const configs = new Map([
       ['barbell_press::main', mainConfig],
       ['barbell_press::accessory', accConfig],

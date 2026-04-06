@@ -20,6 +20,7 @@ const mockWorkoutData: WorkoutData = {
     {
       setType: 'warm-up',
       exercise: 'Overhead Press',
+      displayName: 'Overhead Press',
       sets: [
         { rowIndex: 2, date: '', routine: 'Day 1 – Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '45', actualReps: '' },
       ],
@@ -27,6 +28,7 @@ const mockWorkoutData: WorkoutData = {
     {
       setType: 'main',
       exercise: 'Overhead Press',
+      displayName: 'Overhead Press',
       sets: [
         { rowIndex: 4, date: '', routine: 'Day 1 – Press', setType: 'main', exercise: 'Overhead Press', targetReps: '5', targetWeight: '95', actualReps: '' },
       ],
