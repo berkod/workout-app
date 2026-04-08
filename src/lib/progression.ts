@@ -122,8 +122,10 @@ export function generateWorkoutRows(
     const base = { date: '', routine, exercise, actualReps: '' }
 
     if (setTypeLower === 'warm-up' && config.type === 'main') {
-      for (const s of spec.warmup) {
-        result.push({ ...base, setType, targetReps: s.reps, targetWeight: String(roundToNearest(config.trainingMax * s.pct, config.roundTo)) })
+      for (let i = 0; i < spec.warmup.length; i++) {
+        const s = spec.warmup[i]
+        const weight = i === 0 ? '45' : String(roundToNearest(config.trainingMax * s.pct, config.roundTo))
+        result.push({ ...base, setType, targetReps: s.reps, targetWeight: weight })
       }
     } else if (setTypeLower === 'main' && config.type === 'main') {
       for (const s of spec.main) {

@@ -10,7 +10,7 @@ interface SetRowProps {
 }
 
 export function SetRow({ set, onUpdate }: SetRowProps) {
-  const [actualReps, setActualReps] = useState(set.actualReps)
+  const [actualReps, setActualReps] = useState(set.actualReps || set.targetReps)
   const [saved, setSaved] = useState(!!set.actualReps)
 
   function handleSaveActualReps() {
