@@ -24,12 +24,12 @@ describe('SetRow', () => {
     expect(screen.getByText('5')).toBeInTheDocument()
   })
 
-  it('shows input field for actual reps', () => {
+  it('shows input field for actual reps pre-filled with target reps', () => {
     render(<SetRow set={baseSet} onUpdate={vi.fn()} />)
 
     const input = screen.getByPlaceholderText('Reps')
     expect(input).toBeInTheDocument()
-    expect(input).toHaveValue('')
+    expect(input).toHaveValue('5')
   })
 
   it('shows save button and calls onUpdate when clicked', async () => {
@@ -37,13 +37,22 @@ describe('SetRow', () => {
     const onUpdate = vi.fn()
     render(<SetRow set={baseSet} onUpdate={onUpdate} />)
 
-    const input = screen.getByPlaceholderText('Reps')
-    await user.type(input, '5')
-
     const saveBtn = screen.getByRole('button', { name: /save/i })
     await user.click(saveBtn)
 
     expect(onUpdate).toHaveBeenCalledWith(5, 'actualReps', '5')
+  })
+
+  it('clicking the button on a completed set clears the completion', async () => {
+    const user = userEvent.setup()
+    const onUpdate = vi.fn()
+    const set = { ...baseSet, actualReps: '5' }
+    render(<SetRow set={set} onUpdate={onUpdate} />)
+
+    const btn = screen.getByRole('button', { name: /uncomplete set/i })
+    await user.click(btn)
+
+    expect(onUpdate).toHaveBeenCalledWith(5, 'actualReps', '')
   })
 
   it('displays existing actual reps value', () => {

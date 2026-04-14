@@ -13,9 +13,14 @@ export function SetRow({ set, onUpdate }: SetRowProps) {
   const [actualReps, setActualReps] = useState(set.actualReps || set.targetReps)
   const [saved, setSaved] = useState(!!set.actualReps)
 
-  function handleSaveActualReps() {
-    onUpdate(set.rowIndex, 'actualReps', actualReps)
-    setSaved(true)
+  function handleButtonClick() {
+    if (saved) {
+      onUpdate(set.rowIndex, 'actualReps', '')
+      setSaved(false)
+    } else {
+      onUpdate(set.rowIndex, 'actualReps', actualReps)
+      setSaved(true)
+    }
   }
 
   return (
@@ -49,10 +54,9 @@ export function SetRow({ set, onUpdate }: SetRowProps) {
 
       <button
         type="button"
-        aria-label="Save"
-        onClick={handleSaveActualReps}
-        disabled={saved && actualReps === set.actualReps}
-        className="rounded bg-fall-olive px-2 py-1 text-xs font-medium text-white disabled:opacity-40"
+        aria-label={saved ? 'Uncomplete set' : 'Save'}
+        onClick={handleButtonClick}
+        className={`rounded px-2 py-1 text-xs font-medium text-white ${saved ? 'bg-fall-copper' : 'bg-fall-olive'}`}
       >
         ✓
       </button>

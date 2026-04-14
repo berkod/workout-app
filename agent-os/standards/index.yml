@@ -1,2 +1,11 @@
 # Agent OS Standards Index
 
+google-sheets:
+  auth:
+    description: Google Sheets service account auth pattern; no singleton caching
+  exercise-key-lookup:
+    description: Compound key lookup for exerciseConfigs map; common mistakes
+  exercise-naming:
+    description: Canonical vs. display name for exercises; which to use where
+  sheet-structure:
+    description: Column layout for Sheet1, Config, and State tabs; rowIndex convention
