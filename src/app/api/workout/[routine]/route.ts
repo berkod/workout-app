@@ -21,6 +21,7 @@ function buildWorkoutData(
         setType: row.setType,
         exercise: row.exercise,
         displayName: config?.humanReadable ?? row.exercise,
+        equipment: config?.equipment ?? 'barbell',
         sets: [],
       }
       groups.push(group)

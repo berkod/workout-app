@@ -18,6 +18,7 @@ export interface SetGroup {
   setType: string
   exercise: string      // lowercase canonical
   displayName: string   // human-readable label for UI
+  equipment: string     // from ExerciseConfig, defaults to 'barbell'
   sets: SheetRow[]
 }
 
@@ -33,6 +34,18 @@ export interface ExerciseConfig {
   increment: number
   type: 'main' | 'accessory' | 'bodyweight'
   roundTo: number        // rounding increment for weight calculations, default 2.5
+  equipment: 'barbell' | 'dumbbell' | 'kettlebell' | 'cable' | 'machine' | 'bodyweight'
+}
+
+export interface PlateEntry {
+  weight: number
+  count: number
+}
+
+export interface EquipmentConfig {
+  barWeight: number
+  dumbbellHandleWeight: number
+  plates: PlateEntry[]
 }
 
 export interface WorkoutState {

@@ -1,5 +1,5 @@
 import { google } from 'googleapis'
-import type { ExerciseConfig, SheetRow, WorkoutState } from './types'
+import type { EquipmentConfig, ExerciseConfig, PlateEntry, SheetRow, WorkoutState } from './types'
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID ?? ''
 const SHEET_NAME = 'Sheet1'
@@ -54,7 +54,7 @@ export async function getExerciseConfig(): Promise<Map<string, ExerciseConfig>> 
   const sheets = getSheets()
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'Config!A:F',
+    range: 'Config!A:G',
   })
   const values = response.data.values
   if (!values || values.length <= 1) return new Map()
@@ -64,6 +64,8 @@ export async function getExerciseConfig(): Promise<Map<string, ExerciseConfig>> 
     if (!row[0]) continue
     const exercise = row[0].toLowerCase()
     const type = (['main', 'accessory', 'bodyweight'].includes(row[3]) ? row[3] : 'accessory') as 'main' | 'accessory' | 'bodyweight'
+    const validEquipment = ['barbell', 'dumbbell', 'kettlebell', 'cable', 'machine', 'bodyweight']
+    const equipment = validEquipment.includes(row[6]) ? row[6] : 'barbell'
     const config: ExerciseConfig = {
       exercise,
       humanReadable: row[4] || row[0], // fall back to raw value if col E is empty
@@ -71,6 +73,7 @@ export async function getExerciseConfig(): Promise<Map<string, ExerciseConfig>> 
       increment: Number(row[2]) || 5,
       type,
       roundTo: Number(row[5]) || 2.5,
+      equipment: equipment as ExerciseConfig['equipment'],
     }
     // Compound key: exercise (lowercase) + type
     // bodyweight exercises use 'accessory' in the compound key since they appear as accessories in workouts
@@ -137,6 +140,34 @@ export async function updateWorkoutState(week: number): Promise<void> {
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [[String(week)]] },
   })
+}
+
+export async function getEquipmentConfig(): Promise<EquipmentConfig> {
+  const sheets = getSheets()
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: 'Equipment!A:B',
+  })
+  const values = response.data.values
+  if (!values || values.length === 0) return { barWeight: 45, dumbbellHandleWeight: 0, plates: [] }
+
+  const map = new Map(values.map((row) => [String(row[0]).trim(), String(row[1]).trim()]))
+  const plates: PlateEntry[] = []
+  for (const [key, val] of map.entries()) {
+    if (key === 'bar_weight' || key === 'dumbbell_handle_weight') continue
+    const weight = parseFloat(key)
+    const count = parseInt(val, 10)
+    if (!isNaN(weight) && !isNaN(count) && count > 0) {
+      plates.push({ weight, count })
+    }
+  }
+  plates.sort((a, b) => b.weight - a.weight)
+
+  return {
+    barWeight: parseFloat(map.get('bar_weight') ?? '45') || 45,
+    dumbbellHandleWeight: parseFloat(map.get('dumbbell_handle_weight') ?? '0') || 0,
+    plates,
+  }
 }
 
 export async function updateCell(

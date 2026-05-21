@@ -32,7 +32,7 @@ function makePostRequest(body: object) {
 function makeConfig(entries: Array<[string, Partial<ExerciseConfig>]>): Map<string, ExerciseConfig> {
   const map = new Map<string, ExerciseConfig>()
   for (const [key, partial] of entries) {
-    const config: ExerciseConfig = { exercise: key, humanReadable: key, trainingMax: 100, increment: 5, type: 'main', roundTo: 2.5, ...partial }
+    const config: ExerciseConfig = { exercise: key, humanReadable: key, trainingMax: 100, increment: 5, type: 'main', roundTo: 2.5, equipment: 'barbell', ...partial }
     map.set(key, config)
     const compoundType = config.type === 'bodyweight' ? 'accessory' : config.type
     map.set(`${key}::${compoundType}`, config)

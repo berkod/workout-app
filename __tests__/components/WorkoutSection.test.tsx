@@ -9,6 +9,7 @@ const group: SetGroup = {
   setType: 'warm-up',
   exercise: 'barbell_press',
   displayName: 'Barbell Press',
+  equipment: 'barbell',
   sets: [
     { rowIndex: 2, date: '', routine: 'Day 1', setType: 'warm-up', exercise: 'barbell_press', targetReps: '5', targetWeight: '45', actualReps: '' },
     { rowIndex: 3, date: '', routine: 'Day 1', setType: 'warm-up', exercise: 'barbell_press', targetReps: '5', targetWeight: '65', actualReps: '' },
