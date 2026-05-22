@@ -7,6 +7,7 @@ import type { SheetRow, EditableColumn } from '@/lib/types'
 
 interface SetRowProps {
   set: SheetRow
+  displayName?: string
   equipment?: string
   onUpdate: (rowIndex: number, column: EditableColumn, value: string) => void
 }
@@ -17,7 +18,7 @@ function showPlateButton(targetWeight: string, equipment?: string): boolean {
   return !isNaN(parseFloat(targetWeight))
 }
 
-export function SetRow({ set, equipment, onUpdate }: SetRowProps) {
+export function SetRow({ set, displayName, equipment, onUpdate }: SetRowProps) {
   const [actualReps, setActualReps] = useState(set.actualReps || set.targetReps)
   const [saved, setSaved] = useState(!!set.actualReps)
   const [showPlates, setShowPlates] = useState(false)
@@ -35,7 +36,7 @@ export function SetRow({ set, equipment, onUpdate }: SetRowProps) {
   return (
     <>
       <div className="flex items-center gap-3 border-b border-fall-wheat py-3 last:border-b-0">
-        <span className="flex-1 text-sm font-medium">{set.exercise}</span>
+        <span className="flex-1 text-sm font-medium">{displayName ?? set.exercise}</span>
 
         <EditableField
           value={set.targetWeight}

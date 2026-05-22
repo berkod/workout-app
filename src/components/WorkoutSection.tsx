@@ -45,7 +45,7 @@ export function WorkoutSection({
       {isOpen && (
         <div className="border-t border-fall-wheat px-4">
           {group.sets.map((set) => (
-            <SetRow key={set.rowIndex} set={set} equipment={group.equipment} onUpdate={onUpdate} />
+            <SetRow key={set.rowIndex} set={set} displayName={group.displayName} equipment={group.equipment} onUpdate={onUpdate} />
           ))}
         </div>
       )}
