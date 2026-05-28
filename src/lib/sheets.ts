@@ -119,12 +119,24 @@ export async function getWorkoutState(): Promise<WorkoutState> {
     range: 'State!A:B',
   })
   const values = response.data.values
-  if (!values || values.length <= 1) return { currentWeek: 1 }
+  if (!values || values.length <= 1) {
+    return { currentWeek: 1, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: [] }
+  }
   const map = new Map(values.slice(1).map((row) => [row[0], row[1]]))
-  return { currentWeek: Number(map.get('current_week')) || 1 }
+
+  const disabledRoutines = [...map.entries()]
+    .filter(([key, val]) => key.startsWith('disabled:') && val === '1')
+    .map(([key]) => key.slice('disabled:'.length))
+
+  return {
+    currentWeek: Number(map.get('current_week')) || 1,
+    currentCycle: Number(map.get('current_cycle')) || 1,
+    cyclesBeforeIncrease: Number(map.get('cycles_before_increase')) || 3,
+    disabledRoutines,
+  }
 }
 
-export async function updateWorkoutState(week: number): Promise<void> {
+export async function updateWorkoutState(week: number, cycle?: number): Promise<void> {
   const sheets = getSheets()
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
@@ -132,14 +144,81 @@ export async function updateWorkoutState(week: number): Promise<void> {
   })
   const values = response.data.values
   if (!values) return
-  const rowIndex = values.findIndex((row) => row[0] === 'current_week')
-  if (rowIndex === -1) return
+
+  const weekRowIndex = values.findIndex((row) => row[0] === 'current_week')
+  if (weekRowIndex === -1) return
   await sheets.spreadsheets.values.update({
     spreadsheetId: SHEET_ID,
-    range: `State!B${rowIndex + 1}`,
+    range: `State!B${weekRowIndex + 1}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [[String(week)]] },
   })
+
+  if (cycle !== undefined) {
+    const cycleRowIndex = values.findIndex((row) => row[0] === 'current_cycle')
+    if (cycleRowIndex !== -1) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: `State!B${cycleRowIndex + 1}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [[String(cycle)]] },
+      })
+    }
+  }
+}
+
+export async function setRoutineDisabled(routine: string, disabled: boolean): Promise<void> {
+  const sheets = getSheets()
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: 'State!A:A',
+  })
+  const values = response.data.values ?? []
+  const key = `disabled:${routine}`
+  const rowIndex = values.findIndex((row) => row[0] === key)
+
+  if (rowIndex === -1) {
+    if (!disabled) return
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'State!A:B',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[key, '1']] },
+    })
+  } else {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `State!B${rowIndex + 1}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[disabled ? '1' : '0']] },
+    })
+  }
+}
+
+export async function setCyclesBeforeIncrease(n: 3 | 4): Promise<void> {
+  const sheets = getSheets()
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: 'State!A:A',
+  })
+  const values = response.data.values ?? []
+  const rowIndex = values.findIndex((row) => row[0] === 'cycles_before_increase')
+
+  if (rowIndex === -1) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'State!A:B',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['cycles_before_increase', String(n)]] },
+    })
+  } else {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `State!B${rowIndex + 1}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[String(n)]] },
+    })
+  }
 }
 
 export async function getEquipmentConfig(): Promise<EquipmentConfig> {
