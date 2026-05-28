@@ -92,8 +92,7 @@ describe('Workout page', () => {
 
     await screen.findByText('Day 1 – Press')
 
-    const input = screen.getByPlaceholderText('Reps')
-    await user.type(input, '5')
+    // Input initializes to targetReps ('5'); click Save directly
     await user.click(screen.getByRole('button', { name: /save/i }))
 
     await waitFor(() => {

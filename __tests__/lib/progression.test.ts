@@ -77,11 +77,11 @@ describe('generateWorkoutRows — week 1 (5/5/5+)', () => {
   const historical = makePressHistorical()
   const configs = buildConfigMap(makeConfig('barbell_press', 200))
 
-  it('generates 3 warm-up rows at 40/50/60% of TM', () => {
+  it('generates 3 warm-up rows — bar weight then 50/60% of TM', () => {
     const rows = generateWorkoutRows('Press Day', historical, configs, 1)
     const warmup = rows.filter(r => r.setType === 'warm-up')
     expect(warmup).toHaveLength(3)
-    expect(warmup.map(r => r.targetWeight)).toEqual(['80', '100', '120'])
+    expect(warmup.map(r => r.targetWeight)).toEqual(['45', '100', '120'])
     expect(warmup.every(r => r.targetReps === '5')).toBe(true)
   })
 
