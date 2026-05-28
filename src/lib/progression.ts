@@ -156,3 +156,23 @@ export function generateWorkoutRows(
 
   return result
 }
+
+export function getExercisesToSkip(
+  rows: SheetRow[],
+  disabledRoutines: string[]
+): Set<string> {
+  const disabled = new Set(disabledRoutines)
+  const activeExercises = new Set<string>()
+  const disabledExercises = new Set<string>()
+
+  for (const row of rows) {
+    const ex = row.exercise.toLowerCase()
+    if (disabled.has(row.routine)) {
+      disabledExercises.add(ex)
+    } else {
+      activeExercises.add(ex)
+    }
+  }
+
+  return new Set([...disabledExercises].filter((ex) => !activeExercises.has(ex)))
+}

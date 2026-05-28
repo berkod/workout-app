@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { roundToNearest, generateWorkoutRows, WEEK_SPEC } from '@/lib/progression'
+import { roundToNearest, generateWorkoutRows, WEEK_SPEC, getExercisesToSkip } from '@/lib/progression'
 import type { ExerciseConfig, SheetRow } from '@/lib/types'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -260,5 +260,54 @@ describe('generateWorkoutRows — edge cases', () => {
     // 165 * 0.75 = 123.75 → 125  (nearest 2.5)
     // 165 * 0.85 = 140.25 → 140  (nearest 2.5)
     expect(main.map(r => r.targetWeight)).toEqual(['107.5', '125', '140'])
+  })
+})
+
+describe('getExercisesToSkip', () => {
+  function makeRow(routine: string, exercise: string): SheetRow {
+    return {
+      rowIndex: 1, date: '2026-01-01', routine, setType: 'main',
+      exercise, targetReps: '5', targetWeight: '100', actualReps: '5',
+    }
+  }
+
+  it('returns exercises that only appear in disabled routines', () => {
+    const rows = [
+      makeRow('Day 2 - RDL', 'rdl'),
+      makeRow('Day 1 - Press', 'ohp'),
+    ]
+    const result = getExercisesToSkip(rows, ['Day 2 - RDL'])
+    expect(result).toEqual(new Set(['rdl']))
+  })
+
+  it('does not skip an exercise that appears in both a disabled and an active routine', () => {
+    const rows = [
+      makeRow('Day 2 - RDL', 'rdl'),
+      makeRow('Day 1 - Press', 'rdl'),
+    ]
+    const result = getExercisesToSkip(rows, ['Day 2 - RDL'])
+    expect(result).toEqual(new Set())
+  })
+
+  it('returns empty set when no routines are disabled', () => {
+    const rows = [makeRow('Day 1 - Press', 'ohp')]
+    const result = getExercisesToSkip(rows, [])
+    expect(result).toEqual(new Set())
+  })
+
+  it('normalizes exercise names to lowercase', () => {
+    const rows = [makeRow('Day 2 - RDL', 'RDL')]
+    const result = getExercisesToSkip(rows, ['Day 2 - RDL'])
+    expect(result.has('rdl')).toBe(true)
+  })
+
+  it('skips multiple exercises from multiple disabled routines', () => {
+    const rows = [
+      makeRow('Day 2 - RDL', 'rdl'),
+      makeRow('Day 4 - Squat', 'squat'),
+      makeRow('Day 1 - Press', 'ohp'),
+    ]
+    const result = getExercisesToSkip(rows, ['Day 2 - RDL', 'Day 4 - Squat'])
+    expect(result).toEqual(new Set(['rdl', 'squat']))
   })
 })
