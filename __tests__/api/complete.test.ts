@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ExerciseConfig, SheetRow } from '@/lib/types'
+import type { ExerciseConfig, SheetRow, WorkoutState } from '@/lib/types'
 
 const mockGetAllRows = vi.fn()
 const mockUpdateCell = vi.fn()
@@ -47,7 +47,9 @@ describe('POST /api/complete', () => {
     mockGetAllRows.mockReset()
     mockUpdateCell.mockReset().mockResolvedValue(undefined)
     mockGetExerciseConfig.mockReset().mockResolvedValue(emptyConfig)
-    mockGetWorkoutState.mockReset().mockResolvedValue({ currentWeek: 1 })
+    mockGetWorkoutState.mockReset().mockResolvedValue({
+      currentWeek: 1, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: [],
+    } satisfies WorkoutState)
     mockUpdateWorkoutState.mockReset().mockResolvedValue(undefined)
     mockUpdateExerciseTrainingMax.mockReset().mockResolvedValue(undefined)
   })
@@ -96,7 +98,9 @@ describe('POST /api/complete', () => {
   })
 
   it('returns deloadPrompt:true and does not advance week after completing week 3', async () => {
-    mockGetWorkoutState.mockResolvedValue({ currentWeek: 3 })
+    mockGetWorkoutState.mockResolvedValue({
+      currentWeek: 3, currentCycle: 3, cyclesBeforeIncrease: 3, disabledRoutines: [],
+    } satisfies WorkoutState)
     mockGetAllRows.mockResolvedValue([
       { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '1+', targetWeight: '155', actualReps: '3' },
     ] satisfies SheetRow[])
@@ -109,7 +113,9 @@ describe('POST /api/complete', () => {
   })
 
   it('increments main TMs and resets to week 1 after completing week 4 (deload)', async () => {
-    mockGetWorkoutState.mockResolvedValue({ currentWeek: 4 })
+    mockGetWorkoutState.mockResolvedValue({
+      currentWeek: 4, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: [],
+    } satisfies WorkoutState)
     mockGetExerciseConfig.mockResolvedValue(makeConfig([
       ['barbell_press', { trainingMax: 165, increment: 5, type: 'main' }],
       ['back_squat', { trainingMax: 275, increment: 10, type: 'main' }],
@@ -122,7 +128,7 @@ describe('POST /api/complete', () => {
 
     expect(mockUpdateExerciseTrainingMax).toHaveBeenCalledWith('barbell_press', 170, 'main')
     expect(mockUpdateExerciseTrainingMax).toHaveBeenCalledWith('back_squat', 285, 'main')
-    expect(mockUpdateWorkoutState).toHaveBeenCalledWith(1)
+    expect(mockUpdateWorkoutState).toHaveBeenCalledWith(1, 1)
   })
 
   it('increments accessory training max on completion', async () => {
@@ -154,5 +160,56 @@ describe('POST /api/complete', () => {
 
     expect(data.success).toBe(false)
     expect(mockUpdateCell).not.toHaveBeenCalled()
+  })
+
+  it('silently resets to week 1 and increments cycle when week 3 completes but cycle < cyclesBeforeIncrease', async () => {
+    mockGetWorkoutState.mockResolvedValue({
+      currentWeek: 3, currentCycle: 2, cyclesBeforeIncrease: 3, disabledRoutines: [],
+    } satisfies WorkoutState)
+    mockGetAllRows.mockResolvedValue([
+      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '1+', targetWeight: '155', actualReps: '3' },
+    ] satisfies SheetRow[])
+
+    const res = await makePostRequest({ routine: 'Press Day' })
+    const data = await res.json()
+
+    expect(data.deloadPrompt).toBe(false)
+    expect(mockUpdateWorkoutState).toHaveBeenCalledWith(1, 3)
+    expect(mockUpdateExerciseTrainingMax).not.toHaveBeenCalled()
+  })
+
+  it('shows deload prompt when week 3 completes and currentCycle === cyclesBeforeIncrease', async () => {
+    mockGetWorkoutState.mockResolvedValue({
+      currentWeek: 3, currentCycle: 3, cyclesBeforeIncrease: 3, disabledRoutines: [],
+    } satisfies WorkoutState)
+    mockGetAllRows.mockResolvedValue([
+      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '1+', targetWeight: '155', actualReps: '3' },
+    ] satisfies SheetRow[])
+
+    const res = await makePostRequest({ routine: 'Press Day' })
+    const data = await res.json()
+
+    expect(data.deloadPrompt).toBe(true)
+    expect(mockUpdateWorkoutState).not.toHaveBeenCalled()
+  })
+
+  it('skips TM bump for exercises that only appear in disabled routines after week 4', async () => {
+    mockGetWorkoutState.mockResolvedValue({
+      currentWeek: 4, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: ['Day 2 - RDL'],
+    } satisfies WorkoutState)
+    mockGetExerciseConfig.mockResolvedValue(makeConfig([
+      ['barbell_press', { trainingMax: 165, increment: 5, type: 'main' }],
+      ['rdl', { trainingMax: 225, increment: 10, type: 'main' }],
+    ]))
+    mockGetAllRows.mockResolvedValue([
+      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '65', actualReps: '5' },
+      { rowIndex: 3, date: '2026-03-01', routine: 'Day 2 - RDL', setType: 'main', exercise: 'rdl', targetReps: '5', targetWeight: '145', actualReps: '5' },
+    ] satisfies SheetRow[])
+
+    await makePostRequest({ routine: 'Press Day' })
+
+    expect(mockUpdateExerciseTrainingMax).toHaveBeenCalledWith('barbell_press', 170, 'main')
+    expect(mockUpdateExerciseTrainingMax).not.toHaveBeenCalledWith('rdl', expect.anything(), expect.anything())
+    expect(mockUpdateWorkoutState).toHaveBeenCalledWith(1, 1)
   })
 })

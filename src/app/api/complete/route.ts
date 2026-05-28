@@ -1,4 +1,5 @@
 import { getAllRows, updateCell, getExerciseConfig, getWorkoutState, updateWorkoutState, updateExerciseTrainingMax } from '@/lib/sheets'
+import { getExercisesToSkip } from '@/lib/progression'
 
 export async function POST(request: Request) {
   const body = await request.json()
@@ -10,7 +11,6 @@ export async function POST(request: Request) {
     getWorkoutState(),
   ])
 
-  // Only operate on the current (not-yet-completed) rows for this routine
   const pending = rows.filter((row) => row.routine === routine && row.date === '')
   if (pending.length === 0) {
     return Response.json({ success: false, error: 'No pending rows found' })
@@ -27,14 +27,14 @@ export async function POST(request: Request) {
   }
   await Promise.all(updates)
 
-  // Increment accessory training maxes in config
+  // Increment accessory training maxes (bodyweight excluded)
   const accessoryExercises = [
     ...new Set(
       pending
         .filter((r) => {
           const key = r.exercise.toLowerCase()
           const config = exerciseConfigs.get(`${key}::accessory`) ?? exerciseConfigs.get(key)
-          return config?.type === 'accessory' // bodyweight excluded — nothing to increment
+          return config?.type === 'accessory'
         })
         .map((r) => r.exercise.toLowerCase())
     ),
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     })
   )
 
-  const currentWeek = state.currentWeek
+  const { currentWeek, currentCycle, cyclesBeforeIncrease, disabledRoutines } = state
 
   if (currentWeek < 3) {
     await updateWorkoutState(currentWeek + 1)
@@ -54,15 +54,21 @@ export async function POST(request: Request) {
   }
 
   if (currentWeek === 3) {
-    // Let the user decide: deload week or skip straight to next cycle
+    if (currentCycle < cyclesBeforeIncrease) {
+      await updateWorkoutState(1, currentCycle + 1)
+      return Response.json({ success: true, deloadPrompt: false })
+    }
     return Response.json({ success: true, deloadPrompt: true })
   }
 
-  // Week 4 (deload) just completed: bump all main TMs and reset to week 1
-  const mainExercises = [...exerciseConfigs.values()].filter((c) => c.type === 'main')
+  // Week 4 (deload) completed: bump non-disabled main TMs and reset to cycle 1 week 1
+  const skipExercises = getExercisesToSkip(rows, disabledRoutines)
+  const mainExercises = [...exerciseConfigs.values()].filter(
+    (c) => c.type === 'main' && !skipExercises.has(c.exercise)
+  )
   await Promise.all([
     ...mainExercises.map((c) => updateExerciseTrainingMax(c.exercise, c.trainingMax + c.increment, 'main')),
-    updateWorkoutState(1),
+    updateWorkoutState(1, 1),
   ])
 
   return Response.json({ success: true, deloadPrompt: false })
