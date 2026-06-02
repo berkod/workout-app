@@ -1,5 +1,5 @@
-import { getAllRows, getWorkoutState, setRoutineDisabled, setCyclesBeforeIncrease } from '@/lib/sheets'
-import type { RoutineSummary } from '@/lib/types'
+import { getAllRows, getWorkoutState, setRoutineDisabled, setCyclesBeforeIncrease, setProgram, deleteRows } from '@/lib/sheets'
+import type { Program, RoutineSummary } from '@/lib/types'
 
 export async function GET() {
   const [rows, state] = await Promise.all([getAllRows(), getWorkoutState()])
@@ -23,6 +23,7 @@ export async function GET() {
     allRoutines,
     disabledRoutines: state.disabledRoutines,
     cyclesBeforeIncrease: state.cyclesBeforeIncrease,
+    program: state.program,
   })
 }
 
@@ -30,9 +31,15 @@ export async function PATCH(request: Request) {
   const body = await request.json() as
     | { routine: string; disabled: boolean }
     | { cyclesBeforeIncrease: 3 | 4 }
+    | { program: Program }
 
   if ('routine' in body) {
     await setRoutineDisabled(body.routine, body.disabled)
+  } else if ('program' in body) {
+    await setProgram(body.program)
+    const rows = await getAllRows()
+    const pendingIndices = rows.filter((r) => r.date === '').map((r) => r.rowIndex)
+    await deleteRows(pendingIndices)
   } else {
     await setCyclesBeforeIncrease(body.cyclesBeforeIncrease)
   }

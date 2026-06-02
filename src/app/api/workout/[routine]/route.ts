@@ -55,7 +55,7 @@ export async function GET(
 
   const state = await getWorkoutState()
   const week = state.currentWeek as Week
-  const newRows = generateWorkoutRows(decodedRoutine, historical, exerciseConfigs, week)
+  const newRows = generateWorkoutRows(decodedRoutine, historical, exerciseConfigs, week, state.program)
 
   if (newRows.length === 0) {
     return Response.json({ routine: decodedRoutine, groups: [] })

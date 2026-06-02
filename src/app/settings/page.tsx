@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { saveEquipmentConfig } from '@/lib/equipment'
-import type { EquipmentConfig, RoutineSummary } from '@/lib/types'
+import type { EquipmentConfig, Program, RoutineSummary } from '@/lib/types'
 
 interface SettingsData {
   allRoutines: RoutineSummary[]
   disabledRoutines: string[]
   cyclesBeforeIncrease: 3 | 4
+  program: Program
 }
 
 type SyncState = 'idle' | 'loading' | 'done'
@@ -47,6 +48,15 @@ export default function SettingsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cyclesBeforeIncrease: n }),
+    })
+  }
+
+  async function changeProgram(p: Program) {
+    setData((prev) => (prev ? { ...prev, program: p } : prev))
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/settings`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ program: p }),
     })
   }
 
@@ -136,6 +146,32 @@ export default function SettingsPage() {
                   }`}
                 >
                   {n} cycles
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h2 className="text-base font-semibold text-fall-rust mb-3">Program</h2>
+          <div className="rounded-lg border border-fall-wheat bg-white p-4 shadow-sm">
+            <p className="text-sm font-medium text-fall-bark mb-3">Supplemental work</p>
+            <p className="text-xs text-fall-bark-light mb-3">
+              Switching programs clears any in-progress workouts.
+            </p>
+            <div className="flex gap-3">
+              {(['FSL', 'BBB'] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => changeProgram(p)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-semibold border transition-colors ${
+                    data.program === p
+                      ? 'bg-fall-rust text-white border-fall-rust'
+                      : 'border-fall-wheat text-fall-bark-light'
+                  }`}
+                >
+                  {p === 'FSL' ? 'First Set Last' : 'Boring But Big'}
                 </button>
               ))}
             </div>
