@@ -48,11 +48,14 @@ export interface EquipmentConfig {
   plates: PlateEntry[]
 }
 
+export type Program = 'FSL' | 'BBB'
+
 export interface WorkoutState {
   currentWeek: number  // 1=week1, 2=week2, 3=week3, 4=deload
   currentCycle: number          // 1 to cyclesBeforeIncrease
   cyclesBeforeIncrease: number  // 3 or 4
   disabledRoutines: string[]    // routine names currently disabled
+  program: Program              // supplemental template
 }
 
 export type EditableColumn = 'targetReps' | 'targetWeight' | 'actualReps'
