@@ -263,6 +263,80 @@ describe('generateWorkoutRows — edge cases', () => {
   })
 })
 
+describe('WEEK_SPEC — BBB fields', () => {
+  it('weeks 1–3 have bbbSets = 5', () => {
+    expect(WEEK_SPEC[1].bbbSets).toBe(5)
+    expect(WEEK_SPEC[2].bbbSets).toBe(5)
+    expect(WEEK_SPEC[3].bbbSets).toBe(5)
+  })
+  it('week 4 has bbbSets = 0', () => expect(WEEK_SPEC[4].bbbSets).toBe(0))
+  it('BBB percentages are 50/60/70% for weeks 1/2/3', () => {
+    expect(WEEK_SPEC[1].bbbPct).toBe(0.50)
+    expect(WEEK_SPEC[2].bbbPct).toBe(0.60)
+    expect(WEEK_SPEC[3].bbbPct).toBe(0.70)
+  })
+})
+
+describe('generateWorkoutRows — BBB program', () => {
+  const historical = makePressHistorical()  // has FSL rows in history
+  const configs = buildConfigMap(makeConfig('barbell_press', 200))
+
+  it('generates no FSL rows when program is BBB', () => {
+    const rows = generateWorkoutRows('Press Day', historical, configs, 1, 'BBB')
+    expect(rows.filter(r => r.setType === 'FSL')).toHaveLength(0)
+  })
+
+  it('generates 5 BBB rows at 50% TM for week 1', () => {
+    const rows = generateWorkoutRows('Press Day', historical, configs, 1, 'BBB')
+    const bbb = rows.filter(r => r.setType === 'BBB')
+    expect(bbb).toHaveLength(5)
+    expect(bbb.every(r => r.targetWeight === '100')).toBe(true)  // 200 * 0.50 = 100
+    expect(bbb.every(r => r.targetReps === '10')).toBe(true)
+  })
+
+  it('generates BBB rows at 60% TM for week 2', () => {
+    const rows = generateWorkoutRows('Press Day', historical, configs, 2, 'BBB')
+    const bbb = rows.filter(r => r.setType === 'BBB')
+    expect(bbb).toHaveLength(5)
+    expect(bbb[0].targetWeight).toBe('120')  // 200 * 0.60
+  })
+
+  it('generates BBB rows at 70% TM for week 3', () => {
+    const rows = generateWorkoutRows('Press Day', historical, configs, 3, 'BBB')
+    const bbb = rows.filter(r => r.setType === 'BBB')
+    expect(bbb).toHaveLength(5)
+    expect(bbb[0].targetWeight).toBe('140')  // 200 * 0.70
+  })
+
+  it('generates no BBB rows on deload (week 4)', () => {
+    const rows = generateWorkoutRows('Press Day', historical, configs, 4, 'BBB')
+    expect(rows.filter(r => r.setType === 'BBB')).toHaveLength(0)
+  })
+
+  it('still generates warm-up and main sets', () => {
+    const rows = generateWorkoutRows('Press Day', historical, configs, 1, 'BBB')
+    expect(rows.filter(r => r.setType === 'warm-up')).toHaveLength(3)
+    expect(rows.filter(r => r.setType === 'main')).toHaveLength(3)
+  })
+
+  it('historical FSL rows do not regenerate when program is BBB', () => {
+    // historical contains FSL rows — they should be completely ignored
+    const rows = generateWorkoutRows('Press Day', historical, configs, 1, 'BBB')
+    expect(rows.filter(r => r.setType === 'FSL')).toHaveLength(0)
+    expect(rows.filter(r => r.setType === 'BBB')).toHaveLength(5)
+  })
+
+  it('historical BBB rows do not regenerate when program is FSL', () => {
+    // swap FSL rows in history for BBB rows
+    const bbbHistorical = historical.map(r =>
+      r.setType === 'FSL' ? { ...r, setType: 'BBB', targetReps: '10' } : r
+    )
+    const rows = generateWorkoutRows('Press Day', bbbHistorical, configs, 1, 'FSL')
+    expect(rows.filter(r => r.setType === 'BBB')).toHaveLength(0)
+    expect(rows.filter(r => r.setType === 'FSL')).toHaveLength(5)
+  })
+})
+
 describe('getExercisesToSkip', () => {
   function makeRow(routine: string, exercise: string): SheetRow {
     return {

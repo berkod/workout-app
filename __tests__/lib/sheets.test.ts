@@ -4,6 +4,7 @@ vi.mock('googleapis', () => {
   const mockGet = vi.fn()
   const mockUpdate = vi.fn()
   const mockAppend = vi.fn()
+  const mockBatchUpdate = vi.fn()
   return {
     google: {
       auth: {
@@ -16,21 +17,24 @@ vi.mock('googleapis', () => {
             update: mockUpdate,
             append: mockAppend,
           },
+          batchUpdate: mockBatchUpdate,
         },
       }),
     },
     __mockGet: mockGet,
     __mockUpdate: mockUpdate,
     __mockAppend: mockAppend,
+    __mockBatchUpdate: mockBatchUpdate,
   }
 })
 
-import { getAllRows, updateCell, getWorkoutState, updateWorkoutState, setRoutineDisabled, setCyclesBeforeIncrease } from '@/lib/sheets'
+import { getAllRows, updateCell, getWorkoutState, updateWorkoutState, setRoutineDisabled, setCyclesBeforeIncrease, setProgram, deleteRows } from '@/lib/sheets'
 
 describe('sheets client', () => {
   let mockGet: ReturnType<typeof vi.fn>
   let mockUpdate: ReturnType<typeof vi.fn>
   let mockAppend: ReturnType<typeof vi.fn>
+  let mockBatchUpdate: ReturnType<typeof vi.fn>
 
   beforeEach(async () => {
     vi.resetModules
@@ -38,9 +42,11 @@ describe('sheets client', () => {
     mockGet = mocks.__mockGet
     mockUpdate = mocks.__mockUpdate
     mockAppend = mocks.__mockAppend
+    mockBatchUpdate = mocks.__mockBatchUpdate
     mockGet.mockReset()
     mockUpdate.mockReset()
     mockAppend.mockReset()
+    mockBatchUpdate.mockReset()
   })
 
   describe('getAllRows', () => {
@@ -130,6 +136,22 @@ describe('sheets client', () => {
       expect(state.currentCycle).toBe(1)
       expect(state.cyclesBeforeIncrease).toBe(3)
       expect(state.disabledRoutines).toEqual([])
+    })
+
+    it('parses program key as BBB', async () => {
+      mockGet.mockResolvedValue({
+        data: { values: [['KEY', 'VALUE'], ['current_week', '1'], ['program', 'BBB']] },
+      })
+      const state = await getWorkoutState()
+      expect(state.program).toBe('BBB')
+    })
+
+    it('defaults program to FSL when key is absent', async () => {
+      mockGet.mockResolvedValue({
+        data: { values: [['KEY', 'VALUE'], ['current_week', '1']] },
+      })
+      const state = await getWorkoutState()
+      expect(state.program).toBe('FSL')
     })
   })
 
@@ -221,6 +243,53 @@ describe('sheets client', () => {
       expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
         requestBody: { values: [['cycles_before_increase', '3']] },
       }))
+    })
+  })
+
+  describe('setProgram', () => {
+    it('updates existing program row', async () => {
+      mockGet.mockResolvedValue({
+        data: { values: [['KEY'], ['program']] },
+      })
+      mockUpdate.mockResolvedValue({})
+      await setProgram('BBB')
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+        range: 'State!B2',
+        requestBody: { values: [['BBB']] },
+      }))
+    })
+
+    it('appends new row when program key is absent', async () => {
+      mockGet.mockResolvedValue({
+        data: { values: [['KEY'], ['current_week']] },
+      })
+      mockAppend.mockResolvedValue({})
+      await setProgram('FSL')
+      expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
+        requestBody: { values: [['program', 'FSL']] },
+      }))
+    })
+  })
+
+  describe('deleteRows', () => {
+    it('does nothing when given an empty array', async () => {
+      await deleteRows([])
+      expect(mockBatchUpdate).not.toHaveBeenCalled()
+    })
+
+    it('calls batchUpdate with DeleteDimensionRequests in descending order', async () => {
+      mockBatchUpdate.mockResolvedValue({})
+      await deleteRows([3, 5, 4])  // out of order — must be sorted descending
+      expect(mockBatchUpdate).toHaveBeenCalledWith(expect.objectContaining({
+        requestBody: {
+          requests: [
+            { deleteDimension: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 4, endIndex: 5 } } },
+            { deleteDimension: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 3, endIndex: 4 } } },
+            { deleteDimension: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 2, endIndex: 3 } } },
+          ],
+        },
+      }))
+      // rowIndex 5 → startIndex 4 (0-based), rowIndex 4 → startIndex 3, rowIndex 3 → startIndex 2
     })
   })
 })
