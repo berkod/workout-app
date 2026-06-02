@@ -1,8 +1,10 @@
 import { google } from 'googleapis'
-import type { EquipmentConfig, ExerciseConfig, PlateEntry, SheetRow, WorkoutState } from './types'
+import type { EquipmentConfig, ExerciseConfig, PlateEntry, Program, SheetRow, WorkoutState } from './types'
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID ?? ''
 const SHEET_NAME = 'Sheet1'
+// Sheet1 tab gid — almost always 0 for sheets created via UI. Override via GOOGLE_SHEET1_GID if needed.
+const SHEET1_GID = Number(process.env.GOOGLE_SHEET1_GID ?? '0')
 
 function getSheets() {
   const auth = new google.auth.GoogleAuth({
@@ -120,7 +122,7 @@ export async function getWorkoutState(): Promise<WorkoutState> {
   })
   const values = response.data.values
   if (!values || values.length <= 1) {
-    return { currentWeek: 1, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: [] }
+    return { currentWeek: 1, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: [], program: 'FSL' }
   }
   const map = new Map(values.slice(1).map((row) => [row[0], row[1]]))
 
@@ -128,11 +130,15 @@ export async function getWorkoutState(): Promise<WorkoutState> {
     .filter(([key, val]) => key.startsWith('disabled:') && val === '1')
     .map(([key]) => key.slice('disabled:'.length))
 
+  const programRaw = map.get('program')
+  const program: Program = programRaw === 'BBB' ? 'BBB' : 'FSL'
+
   return {
     currentWeek: Number(map.get('current_week')) || 1,
     currentCycle: Number(map.get('current_cycle')) || 1,
     cyclesBeforeIncrease: Number(map.get('cycles_before_increase')) || 3,
     disabledRoutines,
+    program,
   }
 }
 
@@ -219,6 +225,53 @@ export async function setCyclesBeforeIncrease(n: 3 | 4): Promise<void> {
       requestBody: { values: [[String(n)]] },
     })
   }
+}
+
+export async function setProgram(program: Program): Promise<void> {
+  const sheets = getSheets()
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: 'State!A:A',
+  })
+  const values = response.data.values ?? []
+  const rowIndex = values.findIndex((row) => row[0] === 'program')
+
+  if (rowIndex === -1) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: 'State!A:B',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [['program', program]] },
+    })
+  } else {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range: `State!B${rowIndex + 1}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [[program]] },
+    })
+  }
+}
+
+export async function deleteRows(rowIndices: number[]): Promise<void> {
+  if (rowIndices.length === 0) return
+  const sheets = getSheets()
+  // Sort descending — higher-index deletions must go first to avoid index shifting
+  const sorted = [...rowIndices].sort((a, b) => b - a)
+  const requests = sorted.map((rowIndex) => ({
+    deleteDimension: {
+      range: {
+        sheetId: SHEET1_GID,
+        dimension: 'ROWS',
+        startIndex: rowIndex - 1, // SheetRow.rowIndex is 1-based; startIndex is 0-based
+        endIndex: rowIndex,
+      },
+    },
+  }))
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SHEET_ID,
+    requestBody: { requests },
+  })
 }
 
 export async function getEquipmentConfig(): Promise<EquipmentConfig> {
