@@ -1,4 +1,4 @@
-import type { ExerciseConfig, SheetRow } from './types'
+import type { ExerciseConfig, Program, SheetRow } from './types'
 
 export type Week = 1 | 2 | 3 | 4
 
@@ -13,6 +13,9 @@ interface WeekSpec {
   fslPct: number
   fslSets: number
   fslReps: string
+  bbbPct: number
+  bbbSets: number
+  bbbReps: string
 }
 
 export const WEEK_SPEC: Record<Week, WeekSpec> = {
@@ -27,9 +30,8 @@ export const WEEK_SPEC: Record<Week, WeekSpec> = {
       { pct: 0.75, reps: '5' },
       { pct: 0.85, reps: '5+' },
     ],
-    fslPct: 0.65,
-    fslSets: 5,
-    fslReps: '5',
+    fslPct: 0.65, fslSets: 5, fslReps: '5',
+    bbbPct: 0.50, bbbSets: 5, bbbReps: '10',
   },
   2: {
     warmup: [
@@ -42,9 +44,8 @@ export const WEEK_SPEC: Record<Week, WeekSpec> = {
       { pct: 0.80, reps: '3' },
       { pct: 0.90, reps: '3+' },
     ],
-    fslPct: 0.70,
-    fslSets: 5,
-    fslReps: '5',
+    fslPct: 0.70, fslSets: 5, fslReps: '5',
+    bbbPct: 0.60, bbbSets: 5, bbbReps: '10',
   },
   3: {
     warmup: [
@@ -57,12 +58,11 @@ export const WEEK_SPEC: Record<Week, WeekSpec> = {
       { pct: 0.85, reps: '3' },
       { pct: 0.95, reps: '1+' },
     ],
-    fslPct: 0.75,
-    fslSets: 5,
-    fslReps: '5',
+    fslPct: 0.75, fslSets: 5, fslReps: '5',
+    bbbPct: 0.70, bbbSets: 5, bbbReps: '10',
   },
   4: {
-    // Deload: lighter main work, no FSL
+    // Deload: lighter main work, no supplemental for either program
     warmup: [
       { pct: 0.40, reps: '5' },
       { pct: 0.50, reps: '5' },
@@ -73,9 +73,8 @@ export const WEEK_SPEC: Record<Week, WeekSpec> = {
       { pct: 0.50, reps: '5' },
       { pct: 0.60, reps: '5' },
     ],
-    fslPct: 0,
-    fslSets: 0,
-    fslReps: '5',
+    fslPct: 0, fslSets: 0, fslReps: '5',
+    bbbPct: 0, bbbSets: 0, bbbReps: '10',
   },
 }
 
@@ -83,26 +82,25 @@ export function roundToNearest(weight: number, increment = 2.5): number {
   return Math.round(weight / increment) * increment
 }
 
-/**
- * Generates new workout rows for a routine.
- *
- * Uses all historical rows to derive the exercise/setType structure (so FSL
- * rows are never lost just because the last cycle was a deload). Weights are
- * calculated from the current training max in exerciseConfigs.
- */
+// Historical FSL/BBB rows are skipped when deriving structure — the active program
+// drives what supplemental work gets generated, not what was done in the past.
+const SUPPLEMENTAL_SET_TYPES = new Set(['fsl', 'bbb'])
+
 export function generateWorkoutRows(
   routine: string,
   allHistoricalRows: SheetRow[],
   exerciseConfigs: Map<string, ExerciseConfig>,
   week: Week,
+  program: Program = 'FSL',
 ): Omit<SheetRow, 'rowIndex'>[] {
   const spec = WEEK_SPEC[week]
   const result: Omit<SheetRow, 'rowIndex'>[] = []
 
-  // Collect unique (setType, exercise) pairs in first-appearance order
+  // Collect unique (setType, exercise) pairs — skip FSL/BBB (handled programmatically below)
   const seen = new Set<string>()
   const pairs: Array<{ setType: string; exercise: string }> = []
   for (const row of allHistoricalRows) {
+    if (SUPPLEMENTAL_SET_TYPES.has(row.setType.toLowerCase())) continue
     const key = `${row.setType}::${row.exercise}`
     if (!seen.has(key)) {
       seen.add(key)
@@ -131,12 +129,6 @@ export function generateWorkoutRows(
       for (const s of spec.main) {
         result.push({ ...base, setType, targetReps: s.reps, targetWeight: String(roundToNearest(config.trainingMax * s.pct, config.roundTo)) })
       }
-    } else if (setTypeLower === 'fsl' && config.type === 'main') {
-      if (spec.fslSets === 0) continue // skip FSL on deload
-      const fslWeight = roundToNearest(config.trainingMax * spec.fslPct, config.roundTo)
-      for (let i = 0; i < spec.fslSets; i++) {
-        result.push({ ...base, setType, targetReps: spec.fslReps, targetWeight: String(fslWeight) })
-      }
     } else if (isAccessorySet) {
       // Derive set count and reps from most recent completed occurrence
       const historicalSets = allHistoricalRows.filter(
@@ -147,9 +139,40 @@ export function generateWorkoutRows(
       const numSets = latestSets.length || 1
       const reps = latestSets[0]?.targetReps ?? '10'
       const weight = config.type === 'bodyweight' ? 'BW' : String(config.trainingMax)
-
       for (let i = 0; i < numSets; i++) {
         result.push({ ...base, setType, targetReps: reps, targetWeight: weight })
+      }
+    }
+  }
+
+  // Collect main exercises in order they appear in history, for supplemental generation
+  const mainExercises: string[] = []
+  const seenMain = new Set<string>()
+  for (const row of allHistoricalRows) {
+    if (row.setType.toLowerCase() === 'main' && !seenMain.has(row.exercise)) {
+      seenMain.add(row.exercise)
+      mainExercises.push(row.exercise)
+    }
+  }
+
+  if (program === 'FSL' && spec.fslSets > 0) {
+    for (const exercise of mainExercises) {
+      const key = exercise.toLowerCase()
+      const config = exerciseConfigs.get(`${key}::main`) ?? exerciseConfigs.get(key)
+      if (!config || config.type !== 'main') continue
+      const weight = roundToNearest(config.trainingMax * spec.fslPct, config.roundTo)
+      for (let i = 0; i < spec.fslSets; i++) {
+        result.push({ date: '', routine, exercise, setType: 'FSL', targetReps: spec.fslReps, targetWeight: String(weight), actualReps: '' })
+      }
+    }
+  } else if (program === 'BBB' && spec.bbbSets > 0) {
+    for (const exercise of mainExercises) {
+      const key = exercise.toLowerCase()
+      const config = exerciseConfigs.get(`${key}::main`) ?? exerciseConfigs.get(key)
+      if (!config || config.type !== 'main') continue
+      const weight = roundToNearest(config.trainingMax * spec.bbbPct, config.roundTo)
+      for (let i = 0; i < spec.bbbSets; i++) {
+        result.push({ date: '', routine, exercise, setType: 'BBB', targetReps: spec.bbbReps, targetWeight: String(weight), actualReps: '' })
       }
     }
   }
