@@ -52,6 +52,7 @@ describe('GET /api/settings', () => {
 
 describe('PATCH /api/settings', () => {
   beforeEach(() => {
+    mockGetWorkoutState.mockReset().mockResolvedValue(defaultState)
     mockSetRoutineDisabled.mockReset().mockResolvedValue(undefined)
     mockSetCyclesBeforeIncrease.mockReset().mockResolvedValue(undefined)
     mockSetProgram.mockReset().mockResolvedValue(undefined)
@@ -108,5 +109,21 @@ describe('PATCH /api/settings', () => {
     expect(mockDeleteRows).toHaveBeenCalledWith([5, 6])  // only pending (date==='') rowIndices
     expect(mockSetCyclesBeforeIncrease).not.toHaveBeenCalled()
     expect(mockSetRoutineDisabled).not.toHaveBeenCalled()
+  })
+
+  it('does not call setProgram or deleteRows when program is already selected', async () => {
+    mockGetWorkoutState.mockResolvedValue({ ...defaultState, program: 'BBB' })
+
+    const res = await PATCH(
+      new Request('http://localhost/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ program: 'BBB' }),
+      })
+    )
+    const data = await res.json()
+    expect(data.success).toBe(true)
+    expect(mockSetProgram).not.toHaveBeenCalled()
+    expect(mockDeleteRows).not.toHaveBeenCalled()
   })
 })

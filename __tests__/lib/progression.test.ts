@@ -337,6 +337,49 @@ describe('generateWorkoutRows — BBB program', () => {
   })
 })
 
+describe('generateWorkoutRows — output ordering', () => {
+  const pressWithAccessories = [
+    makeHistoricalRow({ setType: 'warm-up' }),
+    makeHistoricalRow({ setType: 'warm-up' }),
+    makeHistoricalRow({ setType: 'warm-up' }),
+    makeHistoricalRow({ setType: 'main' }),
+    makeHistoricalRow({ setType: 'main' }),
+    makeHistoricalRow({ setType: 'main' }),
+    makeHistoricalRow({ setType: 'BBB', targetReps: '10' }),
+    makeHistoricalRow({ setType: 'BBB', targetReps: '10' }),
+    makeHistoricalRow({ setType: 'BBB', targetReps: '10' }),
+    makeHistoricalRow({ setType: 'BBB', targetReps: '10' }),
+    makeHistoricalRow({ setType: 'BBB', targetReps: '10' }),
+    makeHistoricalRow({ setType: 'accessory', exercise: 'pull_up', targetReps: '10', targetWeight: 'BW' }),
+    makeHistoricalRow({ setType: 'accessory', exercise: 'pull_up', targetReps: '10', targetWeight: 'BW' }),
+  ]
+  const configs = buildConfigMap(
+    makeConfig('barbell_press', 200),
+    makeConfig('pull_up', 0, 'bodyweight', 0),
+  )
+
+  it('BBB rows appear before accessories in the output', () => {
+    const rows = generateWorkoutRows('Press Day', pressWithAccessories, configs, 1, 'BBB')
+    const firstBBBIndex = rows.findIndex(r => r.setType === 'BBB')
+    const firstAccIndex = rows.findIndex(r => r.setType === 'accessory')
+    expect(firstBBBIndex).toBeGreaterThan(-1)
+    expect(firstAccIndex).toBeGreaterThan(-1)
+    expect(firstBBBIndex).toBeLessThan(firstAccIndex)
+  })
+
+  it('FSL rows appear before accessories in the output', () => {
+    const withFSL = pressWithAccessories.map(r =>
+      r.setType === 'BBB' ? { ...r, setType: 'FSL' } : r
+    )
+    const rows = generateWorkoutRows('Press Day', withFSL, configs, 1, 'FSL')
+    const firstFSLIndex = rows.findIndex(r => r.setType === 'FSL')
+    const firstAccIndex = rows.findIndex(r => r.setType === 'accessory')
+    expect(firstFSLIndex).toBeGreaterThan(-1)
+    expect(firstAccIndex).toBeGreaterThan(-1)
+    expect(firstFSLIndex).toBeLessThan(firstAccIndex)
+  })
+})
+
 describe('getExercisesToSkip', () => {
   function makeRow(routine: string, exercise: string): SheetRow {
     return {

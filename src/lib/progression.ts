@@ -108,13 +108,12 @@ export function generateWorkoutRows(
     }
   }
 
+  // Pass 1: warm-up and main sets
   for (const { setType, exercise } of pairs) {
     const setTypeLower = setType.toLowerCase()
-    const isAccessorySet = setTypeLower === 'accessory'
+    if (setTypeLower === 'accessory') continue
     const key = exercise.toLowerCase()
-    const config =
-      exerciseConfigs.get(`${key}::${isAccessorySet ? 'accessory' : 'main'}`) ??
-      exerciseConfigs.get(key)
+    const config = exerciseConfigs.get(`${key}::main`) ?? exerciseConfigs.get(key)
     if (!config) continue
 
     const base = { date: '', routine, exercise, actualReps: '' }
@@ -128,19 +127,6 @@ export function generateWorkoutRows(
     } else if (setTypeLower === 'main' && config.type === 'main') {
       for (const s of spec.main) {
         result.push({ ...base, setType, targetReps: s.reps, targetWeight: String(roundToNearest(config.trainingMax * s.pct, config.roundTo)) })
-      }
-    } else if (isAccessorySet) {
-      // Derive set count and reps from most recent completed occurrence
-      const historicalSets = allHistoricalRows.filter(
-        (r) => r.setType.toLowerCase() === 'accessory' && r.exercise === exercise && r.date !== ''
-      )
-      const latestDate = historicalSets.reduce((max, r) => (r.date > max ? r.date : max), '')
-      const latestSets = historicalSets.filter((r) => r.date === latestDate)
-      const numSets = latestSets.length || 1
-      const reps = latestSets[0]?.targetReps ?? '10'
-      const weight = config.type === 'bodyweight' ? 'BW' : String(config.trainingMax)
-      for (let i = 0; i < numSets; i++) {
-        result.push({ ...base, setType, targetReps: reps, targetWeight: weight })
       }
     }
   }
@@ -174,6 +160,26 @@ export function generateWorkoutRows(
       for (let i = 0; i < spec.bbbSets; i++) {
         result.push({ date: '', routine, exercise, setType: 'BBB', targetReps: spec.bbbReps, targetWeight: String(weight), actualReps: '' })
       }
+    }
+  }
+
+  // Pass 2: accessory sets (after supplemental so order is warm-up → main → BBB/FSL → accessories)
+  for (const { setType, exercise } of pairs) {
+    if (setType.toLowerCase() !== 'accessory') continue
+    const key = exercise.toLowerCase()
+    const config = exerciseConfigs.get(`${key}::accessory`) ?? exerciseConfigs.get(key)
+    if (!config) continue
+
+    const historicalSets = allHistoricalRows.filter(
+      (r) => r.setType.toLowerCase() === 'accessory' && r.exercise === exercise && r.date !== ''
+    )
+    const latestDate = historicalSets.reduce((max, r) => (r.date > max ? r.date : max), '')
+    const latestSets = historicalSets.filter((r) => r.date === latestDate)
+    const numSets = latestSets.length || 1
+    const reps = latestSets[0]?.targetReps ?? '10'
+    const weight = config.type === 'bodyweight' ? 'BW' : String(config.trainingMax)
+    for (let i = 0; i < numSets; i++) {
+      result.push({ date: '', routine, exercise, setType, targetReps: reps, targetWeight: weight, actualReps: '' })
     }
   }
 

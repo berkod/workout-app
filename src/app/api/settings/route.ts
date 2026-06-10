@@ -36,10 +36,13 @@ export async function PATCH(request: Request) {
   if ('routine' in body) {
     await setRoutineDisabled(body.routine, body.disabled)
   } else if ('program' in body) {
-    await setProgram(body.program)
-    const rows = await getAllRows()
-    const pendingIndices = rows.filter((r) => r.date === '').map((r) => r.rowIndex)
-    await deleteRows(pendingIndices)
+    const currentState = await getWorkoutState()
+    if (body.program !== currentState.program) {
+      await setProgram(body.program)
+      const rows = await getAllRows()
+      const pendingIndices = rows.filter((r) => r.date === '').map((r) => r.rowIndex)
+      await deleteRows(pendingIndices)
+    }
   } else {
     await setCyclesBeforeIncrease(body.cyclesBeforeIncrease)
   }
