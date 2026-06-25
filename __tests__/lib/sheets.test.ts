@@ -55,8 +55,8 @@ describe('sheets client', () => {
         data: {
           values: [
             ['DATE', 'ROUTINE', 'SET TYPE', 'EXERCISE', 'TARGET REPS', 'TARGET WEIGHT', 'ACTUAL REPS'],
-            ['2026-03-28', 'Day 1 – Press', 'warm-up', 'Overhead Press', '5', '45', '5'],
-            ['2026-03-28', 'Day 1 – Press', 'main', 'Overhead Press', '5', '95', ''],
+            ['2026-03-28', 'A: Press', 'warm-up', 'Overhead Press', '5', '45', '5'],
+            ['2026-03-28', 'A: Press', 'main', 'Overhead Press', '5', '95', ''],
           ],
         },
       })
@@ -67,7 +67,7 @@ describe('sheets client', () => {
       expect(rows[0]).toEqual({
         rowIndex: 2,
         date: '2026-03-28',
-        routine: 'Day 1 – Press',
+        routine: 'A: Press',
         setType: 'warm-up',
         exercise: 'Overhead Press',
         targetReps: '5',

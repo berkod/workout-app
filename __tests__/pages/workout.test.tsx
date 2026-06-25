@@ -15,7 +15,7 @@ vi.stubGlobal('fetch', mockFetch)
 import WorkoutPage from '@/app/workout/[routine]/page'
 
 const mockWorkoutData: WorkoutData = {
-  routine: 'Day 1 – Press',
+  routine: 'A: Press',
   groups: [
     {
       setType: 'warm-up',
@@ -23,7 +23,7 @@ const mockWorkoutData: WorkoutData = {
       displayName: 'Overhead Press',
       equipment: 'barbell',
       sets: [
-        { rowIndex: 2, date: '', routine: 'Day 1 – Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '45', actualReps: '' },
+        { rowIndex: 2, date: '', routine: 'A: Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '45', actualReps: '' },
       ],
     },
     {
@@ -32,7 +32,7 @@ const mockWorkoutData: WorkoutData = {
       displayName: 'Overhead Press',
       equipment: 'barbell',
       sets: [
-        { rowIndex: 4, date: '', routine: 'Day 1 – Press', setType: 'main', exercise: 'Overhead Press', targetReps: '5', targetWeight: '95', actualReps: '' },
+        { rowIndex: 4, date: '', routine: 'A: Press', setType: 'main', exercise: 'Overhead Press', targetReps: '5', targetWeight: '95', actualReps: '' },
       ],
     },
   ],
@@ -51,7 +51,7 @@ describe('Workout page', () => {
 
     render(<WorkoutPage />)
 
-    expect(await screen.findByText('Day 1 – Press')).toBeInTheDocument()
+    expect(await screen.findByText('A: Press')).toBeInTheDocument()
     expect(screen.getByText('warm-up')).toBeInTheDocument()
     expect(screen.getByText('main')).toBeInTheDocument()
   })
@@ -65,7 +65,7 @@ describe('Workout page', () => {
     render(<WorkoutPage />)
 
     // Wait for load
-    await screen.findByText('Day 1 – Press')
+    await screen.findByText('A: Press')
 
     // warm-up section should show its set rows (target weight 45 visible)
     expect(screen.getByText('45')).toBeInTheDocument()
@@ -90,7 +90,7 @@ describe('Workout page', () => {
 
     render(<WorkoutPage />)
 
-    await screen.findByText('Day 1 – Press')
+    await screen.findByText('A: Press')
 
     // Input initializes to targetReps ('5'); click Save directly
     await user.click(screen.getByRole('button', { name: /save/i }))
@@ -112,7 +112,7 @@ describe('Workout page', () => {
 
     render(<WorkoutPage />)
 
-    await screen.findByText('Day 1 – Press')
+    await screen.findByText('A: Press')
 
     expect(
       screen.getByRole('button', { name: /complete workout/i })

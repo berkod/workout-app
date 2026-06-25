@@ -345,8 +345,8 @@ describe('sheets client', () => {
         data: {
           values: [
             ['DATE', 'ROUTINE', 'SET TYPE', 'EXERCISE', 'TARGET REPS', 'TARGET WEIGHT', 'ACTUAL REPS'],
-            ['2026-03-28', 'Day 1 – Press', 'warm-up', 'Overhead Press', '5', '45', '5'],
-            ['2026-03-28', 'Day 1 – Press', 'main', 'Overhead Press', '5', '95', ''],
+            ['2026-03-28', 'A: Press', 'warm-up', 'Overhead Press', '5', '45', '5'],
+            ['2026-03-28', 'A: Press', 'main', 'Overhead Press', '5', '95', ''],
           ],
         },
       })
@@ -357,7 +357,7 @@ describe('sheets client', () => {
       expect(rows[0]).toEqual({
         rowIndex: 2,
         date: '2026-03-28',
-        routine: 'Day 1 – Press',
+        routine: 'A: Press',
         setType: 'warm-up',
         exercise: 'Overhead Press',
         targetReps: '5',
@@ -511,9 +511,9 @@ describe('GET /api/routines', () => {
 
   it('returns unique routines with last completed dates', async () => {
     mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '2026-03-25', routine: 'Day 1 – Press', setType: 'warm-up', exercise: 'OHP', targetReps: '5', targetWeight: '45', actualReps: '5' },
-      { rowIndex: 3, date: '2026-03-28', routine: 'Day 1 – Press', setType: 'main', exercise: 'OHP', targetReps: '5', targetWeight: '95', actualReps: '5' },
-      { rowIndex: 4, date: '2026-03-26', routine: 'Day 2 – RDL', setType: 'warm-up', exercise: 'RDL', targetReps: '5', targetWeight: '135', actualReps: '5' },
+      { rowIndex: 2, date: '2026-03-25', routine: 'A: Press', setType: 'warm-up', exercise: 'OHP', targetReps: '5', targetWeight: '45', actualReps: '5' },
+      { rowIndex: 3, date: '2026-03-28', routine: 'A: Press', setType: 'main', exercise: 'OHP', targetReps: '5', targetWeight: '95', actualReps: '5' },
+      { rowIndex: 4, date: '2026-03-26', routine: 'B: RDL', setType: 'warm-up', exercise: 'RDL', targetReps: '5', targetWeight: '135', actualReps: '5' },
       { rowIndex: 5, date: '', routine: 'Day 3 – Bench', setType: 'warm-up', exercise: 'Bench', targetReps: '5', targetWeight: '45', actualReps: '' },
     ] satisfies SheetRow[])
 
@@ -521,8 +521,8 @@ describe('GET /api/routines', () => {
     const data = await response.json()
 
     expect(data).toEqual([
-      { name: 'Day 1 – Press', lastCompleted: '2026-03-28' },
-      { name: 'Day 2 – RDL', lastCompleted: '2026-03-26' },
+      { name: 'A: Press', lastCompleted: '2026-03-28' },
+      { name: 'B: RDL', lastCompleted: '2026-03-26' },
       { name: 'Day 3 – Bench', lastCompleted: null },
     ])
   })
@@ -629,16 +629,16 @@ describe('GET /api/workout/[routine]', () => {
 
   it('returns sets grouped by setType and exercise', async () => {
     mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Day 1 – Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '45', actualReps: '' },
-      { rowIndex: 3, date: '', routine: 'Day 1 – Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '65', actualReps: '' },
-      { rowIndex: 4, date: '', routine: 'Day 1 – Press', setType: 'main', exercise: 'Overhead Press', targetReps: '5', targetWeight: '95', actualReps: '' },
-      { rowIndex: 5, date: '', routine: 'Day 2 – RDL', setType: 'warm-up', exercise: 'RDL', targetReps: '5', targetWeight: '135', actualReps: '' },
+      { rowIndex: 2, date: '', routine: 'A: Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '45', actualReps: '' },
+      { rowIndex: 3, date: '', routine: 'A: Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '65', actualReps: '' },
+      { rowIndex: 4, date: '', routine: 'A: Press', setType: 'main', exercise: 'Overhead Press', targetReps: '5', targetWeight: '95', actualReps: '' },
+      { rowIndex: 5, date: '', routine: 'B: RDL', setType: 'warm-up', exercise: 'RDL', targetReps: '5', targetWeight: '135', actualReps: '' },
     ] satisfies SheetRow[])
 
-    const response = await makeRequest('Day 1 – Press')
+    const response = await makeRequest('A: Press')
     const data = await response.json()
 
-    expect(data.routine).toBe('Day 1 – Press')
+    expect(data.routine).toBe('A: Press')
     expect(data.groups).toHaveLength(2)
     expect(data.groups[0]).toEqual({
       setType: 'warm-up',
@@ -901,12 +901,12 @@ describe('POST /api/complete', () => {
 
   it('fills empty actualReps with 0 and sets date for all rows in routine', async () => {
     mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Day 1 – Press', setType: 'warm-up', exercise: 'OHP', targetReps: '5', targetWeight: '45', actualReps: '5' },
-      { rowIndex: 3, date: '', routine: 'Day 1 – Press', setType: 'main', exercise: 'OHP', targetReps: '5', targetWeight: '95', actualReps: '' },
-      { rowIndex: 4, date: '', routine: 'Day 2 – RDL', setType: 'warm-up', exercise: 'RDL', targetReps: '5', targetWeight: '135', actualReps: '' },
+      { rowIndex: 2, date: '', routine: 'A: Press', setType: 'warm-up', exercise: 'OHP', targetReps: '5', targetWeight: '45', actualReps: '5' },
+      { rowIndex: 3, date: '', routine: 'A: Press', setType: 'main', exercise: 'OHP', targetReps: '5', targetWeight: '95', actualReps: '' },
+      { rowIndex: 4, date: '', routine: 'B: RDL', setType: 'warm-up', exercise: 'RDL', targetReps: '5', targetWeight: '135', actualReps: '' },
     ] satisfies SheetRow[])
 
-    const response = await makePostRequest({ routine: 'Day 1 – Press' })
+    const response = await makePostRequest({ routine: 'A: Press' })
     const data = await response.json()
 
     expect(data).toEqual({ success: true, rowsUpdated: 2 })
@@ -999,10 +999,10 @@ import { RoutineCard } from '@/components/RoutineCard'
 describe('RoutineCard', () => {
   it('displays routine name and last completed date', () => {
     render(
-      <RoutineCard name="Day 1 – Press" lastCompleted="2026-03-28" />
+      <RoutineCard name="A: Press" lastCompleted="2026-03-28" />
     )
 
-    expect(screen.getByText('Day 1 – Press')).toBeInTheDocument()
+    expect(screen.getByText('A: Press')).toBeInTheDocument()
     expect(screen.getByText('Last: 2026-03-28')).toBeInTheDocument()
   })
 
@@ -1014,7 +1014,7 @@ describe('RoutineCard', () => {
   })
 
   it('renders as a link to the workout page', () => {
-    render(<RoutineCard name="Day 1 – Press" lastCompleted="2026-03-28" />)
+    render(<RoutineCard name="A: Press" lastCompleted="2026-03-28" />)
 
     const link = screen.getByRole('link')
     expect(link).toHaveAttribute(
@@ -1248,7 +1248,7 @@ import type { SheetRow } from '@/lib/types'
 const baseSet: SheetRow = {
   rowIndex: 5,
   date: '',
-  routine: 'Day 1 – Press',
+  routine: 'A: Press',
   setType: 'main',
   exercise: 'Overhead Press',
   targetReps: '5',
@@ -1695,16 +1695,16 @@ describe('Home page', () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => [
-        { name: 'Day 1 – Press', lastCompleted: '2026-03-28' },
-        { name: 'Day 2 – RDL', lastCompleted: null },
+        { name: 'A: Press', lastCompleted: '2026-03-28' },
+        { name: 'B: RDL', lastCompleted: null },
       ],
     })
 
     render(<Home />)
 
     // Wait for data to load
-    expect(await screen.findByText('Day 1 – Press')).toBeInTheDocument()
-    expect(screen.getByText('Day 2 – RDL')).toBeInTheDocument()
+    expect(await screen.findByText('A: Press')).toBeInTheDocument()
+    expect(screen.getByText('B: RDL')).toBeInTheDocument()
     expect(screen.getByText('Last: 2026-03-28')).toBeInTheDocument()
     expect(screen.getByText('Last: Never')).toBeInTheDocument()
   })
@@ -1820,20 +1820,20 @@ vi.stubGlobal('fetch', mockFetch)
 import WorkoutPage from '@/app/workout/[routine]/page'
 
 const mockWorkoutData: WorkoutData = {
-  routine: 'Day 1 – Press',
+  routine: 'A: Press',
   groups: [
     {
       setType: 'warm-up',
       exercise: 'Overhead Press',
       sets: [
-        { rowIndex: 2, date: '', routine: 'Day 1 – Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '45', actualReps: '' },
+        { rowIndex: 2, date: '', routine: 'A: Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '45', actualReps: '' },
       ],
     },
     {
       setType: 'main',
       exercise: 'Overhead Press',
       sets: [
-        { rowIndex: 4, date: '', routine: 'Day 1 – Press', setType: 'main', exercise: 'Overhead Press', targetReps: '5', targetWeight: '95', actualReps: '' },
+        { rowIndex: 4, date: '', routine: 'A: Press', setType: 'main', exercise: 'Overhead Press', targetReps: '5', targetWeight: '95', actualReps: '' },
       ],
     },
   ],
@@ -1852,7 +1852,7 @@ describe('Workout page', () => {
 
     render(<WorkoutPage />)
 
-    expect(await screen.findByText('Day 1 – Press')).toBeInTheDocument()
+    expect(await screen.findByText('A: Press')).toBeInTheDocument()
     expect(screen.getByText('warm-up')).toBeInTheDocument()
     expect(screen.getByText('main')).toBeInTheDocument()
   })
@@ -1866,7 +1866,7 @@ describe('Workout page', () => {
     render(<WorkoutPage />)
 
     // Wait for load
-    await screen.findByText('Day 1 – Press')
+    await screen.findByText('A: Press')
 
     // warm-up section should show its set rows (target weight 45 visible)
     expect(screen.getByText('45')).toBeInTheDocument()
@@ -1891,7 +1891,7 @@ describe('Workout page', () => {
 
     render(<WorkoutPage />)
 
-    await screen.findByText('Day 1 – Press')
+    await screen.findByText('A: Press')
 
     const input = screen.getByPlaceholderText('Reps')
     await user.type(input, '5')
@@ -1914,7 +1914,7 @@ describe('Workout page', () => {
 
     render(<WorkoutPage />)
 
-    await screen.findByText('Day 1 – Press')
+    await screen.findByText('A: Press')
 
     expect(
       screen.getByRole('button', { name: /complete workout/i })

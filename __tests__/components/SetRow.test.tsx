@@ -7,7 +7,7 @@ import type { SheetRow } from '@/lib/types'
 const baseSet: SheetRow = {
   rowIndex: 5,
   date: '',
-  routine: 'Day 1 – Press',
+  routine: 'A: Press',
   setType: 'main',
   exercise: 'Overhead Press',
   targetReps: '5',
