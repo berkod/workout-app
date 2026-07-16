@@ -28,7 +28,7 @@ function buildWorkoutData(
     }
     group.sets.push(row)
   }
-  return { routine, groups }
+  return { routine, groups, isPreview: false }
 }
 
 export async function GET(
@@ -38,19 +38,49 @@ export async function GET(
   const { routine } = await params
   const decodedRoutine = decodeURIComponent(routine)
 
-  // Fetch rows and config in parallel; config is needed for display names regardless
   const [rows, exerciseConfigs] = await Promise.all([getAllRows(), getExerciseConfig()])
 
-  // Bug fix: only show empty-date (not-yet-done) rows for this routine
   const pending = rows.filter((r) => r.routine === decodedRoutine && r.date === '')
   if (pending.length > 0) {
     return Response.json(buildWorkoutData(decodedRoutine, pending, exerciseConfigs))
   }
 
-  // No pending rows: generate the next workout from historical data
   const historical = rows.filter((r) => r.routine === decodedRoutine && r.date !== '')
   if (historical.length === 0) {
-    return Response.json({ routine: decodedRoutine, groups: [] })
+    return Response.json({ routine: decodedRoutine, groups: [], isPreview: false })
+  }
+
+  // No pending rows but history exists — return a preview without writing to the sheet.
+  // Negative rowIndices are sentinels: they guarantee unique React keys and signal
+  // that these rows have no backing sheet row (onUpdate must not be called).
+  const state = await getWorkoutState()
+  const week = state.currentWeek as Week
+  const previewRows = generateWorkoutRows(decodedRoutine, historical, exerciseConfigs, week, state.program)
+    .map((r, i): SheetRow => ({ ...r, rowIndex: -(i + 1), date: '', actualReps: '' }))
+
+  const preview = buildWorkoutData(decodedRoutine, previewRows, exerciseConfigs)
+  return Response.json({ ...preview, isPreview: true })
+}
+
+// POST: user pressed "Start Workout" — generate rows and commit them to the sheet.
+export async function POST(
+  _request: Request,
+  { params }: { params: Promise<{ routine: string }> }
+) {
+  const { routine } = await params
+  const decodedRoutine = decodeURIComponent(routine)
+
+  const [rows, exerciseConfigs] = await Promise.all([getAllRows(), getExerciseConfig()])
+
+  // Idempotent: if rows were already generated (e.g., double-tap), return them.
+  const existing = rows.filter((r) => r.routine === decodedRoutine && r.date === '')
+  if (existing.length > 0) {
+    return Response.json(buildWorkoutData(decodedRoutine, existing, exerciseConfigs))
+  }
+
+  const historical = rows.filter((r) => r.routine === decodedRoutine && r.date !== '')
+  if (historical.length === 0) {
+    return Response.json({ routine: decodedRoutine, groups: [], isPreview: false })
   }
 
   const state = await getWorkoutState()
@@ -58,10 +88,9 @@ export async function GET(
   const newRows = generateWorkoutRows(decodedRoutine, historical, exerciseConfigs, week, state.program)
 
   if (newRows.length === 0) {
-    return Response.json({ routine: decodedRoutine, groups: [] })
+    return Response.json({ routine: decodedRoutine, groups: [], isPreview: false })
   }
 
-  // Append to sheet, then re-fetch to get real rowIndices
   await appendRows(newRows)
   const refreshed = await getAllRows()
   const appended = refreshed.filter((r) => r.routine === decodedRoutine && r.date === '')

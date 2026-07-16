@@ -14,6 +14,7 @@ export default function WorkoutPage() {
   const [workout, setWorkout] = useState<WorkoutData | null>(null)
   const [openSections, setOpenSections] = useState<Set<string>>(new Set())
   const [completing, setCompleting] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [showDeloadPrompt, setShowDeloadPrompt] = useState(false)
 
   useEffect(() => {
@@ -21,10 +22,8 @@ export default function WorkoutPage() {
       .then((res) => res.json())
       .then((data: WorkoutData) => {
         setWorkout(data)
-        // Open the first section (warm-up) by default
         if (data.groups.length > 0) {
-          const firstKey = sectionKey(data.groups[0])
-          setOpenSections(new Set([firstKey]))
+          setOpenSections(new Set([sectionKey(data.groups[0])]))
         }
       })
   }, [routineName])
@@ -53,7 +52,6 @@ export default function WorkoutPage() {
         body: JSON.stringify({ rowIndex, column, value }),
       })
 
-      // Update local state
       setWorkout((prev) => {
         if (!prev) return prev
         const updated = {
@@ -66,7 +64,6 @@ export default function WorkoutPage() {
           })),
         }
 
-        // Auto-advance: if all sets in a section are now complete, close it and open next
         if (column === 'actualReps') {
           const currentGroupIndex = updated.groups.findIndex((g) =>
             g.sets.some((s) => s.rowIndex === rowIndex)
@@ -80,7 +77,6 @@ export default function WorkoutPage() {
               setOpenSections((prev) => {
                 const next = new Set(prev)
                 next.delete(sectionKey(currentGroup))
-                // Open next section if it exists
                 if (currentGroupIndex + 1 < updated.groups.length) {
                   next.add(sectionKey(updated.groups[currentGroupIndex + 1]))
                 }
@@ -95,6 +91,19 @@ export default function WorkoutPage() {
     },
     []
   )
+
+  async function handleStartWorkout() {
+    setStarting(true)
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/api/workout/${encodeURIComponent(routineName)}`, {
+      method: 'POST',
+    })
+    const data: WorkoutData = await res.json()
+    setWorkout(data)
+    if (data.groups.length > 0) {
+      setOpenSections(new Set([sectionKey(data.groups[0])]))
+    }
+    setStarting(false)
+  }
 
   async function handleComplete() {
     setCompleting(true)
@@ -129,6 +138,17 @@ export default function WorkoutPage() {
     <div>
       <h1 className="text-xl font-bold text-fall-rust">{workout.routine}</h1>
 
+      {workout.isPreview && (
+        <button
+          type="button"
+          onClick={handleStartWorkout}
+          disabled={starting}
+          className="mt-4 w-full rounded-xl bg-fall-rust py-3 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {starting ? 'Starting…' : 'Start Workout'}
+        </button>
+      )}
+
       <div className="mt-4">
         {workout.groups.map((group) => {
           const key = sectionKey(group)
@@ -137,6 +157,7 @@ export default function WorkoutPage() {
               key={key}
               group={group}
               isOpen={openSections.has(key)}
+              isPreview={workout.isPreview}
               onToggle={() => toggleSection(key)}
               onUpdate={handleUpdate}
             />
@@ -144,7 +165,9 @@ export default function WorkoutPage() {
         })}
       </div>
 
-      <CompleteButton onComplete={handleComplete} loading={completing} />
+      {!workout.isPreview && (
+        <CompleteButton onComplete={handleComplete} loading={completing} />
+      )}
 
       {showDeloadPrompt && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-6 z-50">

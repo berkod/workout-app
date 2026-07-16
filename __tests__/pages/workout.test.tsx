@@ -16,6 +16,7 @@ import WorkoutPage from '@/app/workout/[routine]/page'
 
 const mockWorkoutData: WorkoutData = {
   routine: 'A: Press',
+  isPreview: false,
   groups: [
     {
       setType: 'warm-up',
@@ -33,6 +34,22 @@ const mockWorkoutData: WorkoutData = {
       equipment: 'barbell',
       sets: [
         { rowIndex: 4, date: '', routine: 'A: Press', setType: 'main', exercise: 'Overhead Press', targetReps: '5', targetWeight: '95', actualReps: '' },
+      ],
+    },
+  ],
+}
+
+const mockPreviewData: WorkoutData = {
+  routine: 'A: Press',
+  isPreview: true,
+  groups: [
+    {
+      setType: 'warm-up',
+      exercise: 'Overhead Press',
+      displayName: 'Overhead Press',
+      equipment: 'barbell',
+      sets: [
+        { rowIndex: -1, date: '', routine: 'A: Press', setType: 'warm-up', exercise: 'Overhead Press', targetReps: '5', targetWeight: '45', actualReps: '' },
       ],
     },
   ],
@@ -104,7 +121,7 @@ describe('Workout page', () => {
     })
   })
 
-  it('shows Complete Workout button', async () => {
+  it('shows Complete Workout button when not a preview', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => mockWorkoutData,
@@ -117,5 +134,42 @@ describe('Workout page', () => {
     expect(
       screen.getByRole('button', { name: /complete workout/i })
     ).toBeInTheDocument()
+  })
+
+  it('shows Start Workout button and hides Complete button in preview mode', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => mockPreviewData,
+    })
+
+    render(<WorkoutPage />)
+
+    await screen.findByText('A: Press')
+
+    expect(screen.getByRole('button', { name: /start workout/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /complete workout/i })).not.toBeInTheDocument()
+  })
+
+  it('calls POST and transitions to active mode when Start Workout is clicked', async () => {
+    const user = userEvent.setup()
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, json: async () => mockPreviewData })
+      .mockResolvedValueOnce({ ok: true, json: async () => mockWorkoutData })
+
+    render(<WorkoutPage />)
+
+    await screen.findByText('A: Press')
+    await user.click(screen.getByRole('button', { name: /start workout/i }))
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/workout/'),
+      expect.objectContaining({ method: 'POST' })
+    )
+
+    // After POST, Complete button should appear and Start button should be gone
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /complete workout/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /start workout/i })).not.toBeInTheDocument()
+    })
   })
 })

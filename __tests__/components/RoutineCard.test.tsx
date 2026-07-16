@@ -20,12 +20,12 @@ describe('RoutineCard', () => {
   })
 
   it('renders as a link to the workout page', () => {
-    render(<RoutineCard name="A: Press" lastCompleted="2026-03-28" />)
+    render(<RoutineCard name="Day 1 – Press BBB" lastCompleted="2026-03-28" />)
 
     const link = screen.getByRole('link')
     expect(link).toHaveAttribute(
       'href',
-      '/workout/Day%201%20%E2%80%93%20Press'
+      '/workout/Day%201%20%E2%80%93%20Press%20BBB'
     )
   })
 })

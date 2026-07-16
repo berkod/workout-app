@@ -9,6 +9,7 @@ interface SetRowProps {
   set: SheetRow
   displayName?: string
   equipment?: string
+  isPreview?: boolean
   onUpdate: (rowIndex: number, column: EditableColumn, value: string) => void
 }
 
@@ -18,7 +19,7 @@ function showPlateButton(targetWeight: string, equipment?: string): boolean {
   return !isNaN(parseFloat(targetWeight))
 }
 
-export function SetRow({ set, displayName, equipment, onUpdate }: SetRowProps) {
+export function SetRow({ set, displayName, equipment, isPreview = false, onUpdate }: SetRowProps) {
   const [actualReps, setActualReps] = useState(set.actualReps || set.targetReps)
   const [saved, setSaved] = useState(!!set.actualReps)
   const [showPlates, setShowPlates] = useState(false)
@@ -31,6 +32,17 @@ export function SetRow({ set, displayName, equipment, onUpdate }: SetRowProps) {
       onUpdate(set.rowIndex, 'actualReps', actualReps)
       setSaved(true)
     }
+  }
+
+  if (isPreview) {
+    return (
+      <div className="flex items-center gap-3 border-b border-fall-wheat py-3 last:border-b-0">
+        <span className="flex-1 text-sm font-medium text-fall-bark-light">{displayName ?? set.exercise}</span>
+        <span className="text-sm text-fall-bark-light">{set.targetWeight}</span>
+        <span className="text-fall-bark-light">×</span>
+        <span className="text-sm text-fall-bark-light">{set.targetReps}</span>
+      </div>
+    )
   }
 
   return (

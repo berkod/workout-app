@@ -77,4 +77,25 @@ describe('SetRow', () => {
 
     expect(onUpdate).toHaveBeenCalledWith(5, 'targetWeight', '100')
   })
+
+  describe('preview mode', () => {
+    it('shows target weight and reps as static text', () => {
+      render(<SetRow set={baseSet} isPreview onUpdate={vi.fn()} />)
+
+      expect(screen.getByText('95')).toBeInTheDocument()
+      expect(screen.getByText('5')).toBeInTheDocument()
+    })
+
+    it('hides the actual reps input', () => {
+      render(<SetRow set={baseSet} isPreview onUpdate={vi.fn()} />)
+
+      expect(screen.queryByPlaceholderText('Reps')).not.toBeInTheDocument()
+    })
+
+    it('hides the save button', () => {
+      render(<SetRow set={baseSet} isPreview onUpdate={vi.fn()} />)
+
+      expect(screen.queryByRole('button', { name: /save/i })).not.toBeInTheDocument()
+    })
+  })
 })

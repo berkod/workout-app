@@ -70,4 +70,12 @@ describe('WorkoutSection', () => {
 
     expect(screen.getByText('1/2')).toBeInTheDocument()
   })
+
+  it('hides completion count in preview mode', () => {
+    render(
+      <WorkoutSection group={group} isOpen={false} isPreview onToggle={vi.fn()} onUpdate={vi.fn()} />
+    )
+
+    expect(screen.queryByText('0/2')).not.toBeInTheDocument()
+  })
 })

@@ -25,6 +25,7 @@ export interface SetGroup {
 export interface WorkoutData {
   routine: string
   groups: SetGroup[]
+  isPreview: boolean
 }
 
 export interface ExerciseConfig {
