@@ -168,36 +168,51 @@ describe('generateWorkoutRows — week 4 (deload)', () => {
 })
 
 describe('generateWorkoutRows — accessories', () => {
-  it('uses trainingMax from config and preserves set count/reps from history', () => {
+  it('increments weight by 5lbs from the previous session and preserves set count/reps', () => {
     const historical = [
-      makeHistoricalRow({ setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '45' }),
-      makeHistoricalRow({ setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '45' }),
-      makeHistoricalRow({ setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '45' }),
+      makeHistoricalRow({ setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '60' }),
+      makeHistoricalRow({ setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '60' }),
+      makeHistoricalRow({ setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '60' }),
     ]
-    const configs = buildConfigMap(makeConfig('db_bench_press', 50, 'accessory'))
+    const configs = buildConfigMap(makeConfig('db_bench_press', 100, 'accessory'))
 
     const rows = generateWorkoutRows('Press Day', historical, configs, 1)
     const acc = rows.filter(r => r.setType === 'accessory')
 
     expect(acc).toHaveLength(3)
-    expect(acc.every(r => r.targetWeight === '50')).toBe(true)
+    expect(acc.every(r => r.targetWeight === '65')).toBe(true)  // 60 + 5
     expect(acc.every(r => r.targetReps === '10')).toBe(true)
   })
 
-  it('uses most recent date when multiple historical sessions exist', () => {
+  it('uses most recent date when multiple historical sessions exist, then increments by 5', () => {
     const historical = [
       makeHistoricalRow({ date: '2026-03-01', setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '45' }),
       makeHistoricalRow({ date: '2026-03-01', setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '45' }),
       makeHistoricalRow({ date: '2026-03-28', setType: 'accessory', exercise: 'db_bench_press', targetReps: '12', targetWeight: '50' }),
     ]
-    const configs = buildConfigMap(makeConfig('db_bench_press', 55, 'accessory'))
+    const configs = buildConfigMap(makeConfig('db_bench_press', 100, 'accessory'))
 
     const rows = generateWorkoutRows('Press Day', historical, configs, 1)
     const acc = rows.filter(r => r.setType === 'accessory')
 
-    // Most recent session had 1 set with reps '12'
+    // Most recent session had 1 set at 50lbs → next is 55
     expect(acc).toHaveLength(1)
     expect(acc[0].targetReps).toBe('12')
+    expect(acc[0].targetWeight).toBe('55')  // 50 + 5
+  })
+
+  it('falls back to trainingMax when no completed accessory history exists', () => {
+    // Pending (date='') rows establish the pair but not the historical weight
+    const historical = [
+      makeHistoricalRow({ date: '', setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '40', actualReps: '' }),
+    ]
+    const configs = buildConfigMap(makeConfig('db_bench_press', 45, 'accessory'))
+
+    const rows = generateWorkoutRows('Press Day', historical, configs, 1)
+    const acc = rows.filter(r => r.setType === 'accessory')
+
+    expect(acc).toHaveLength(1)
+    expect(acc[0].targetWeight).toBe('45')  // fallback to TM
   })
 })
 
@@ -245,8 +260,8 @@ describe('generateWorkoutRows — edge cases', () => {
 
     // Main uses TM=165: 65% = 107.25 → 107.5 (nearest 2.5)
     expect(mainRows[0].targetWeight).toBe('107.5')
-    // Accessory uses trainingMax=95
-    expect(accRows[0].targetWeight).toBe('95')
+    // Accessory increments from previous target (95) by 5 → 100
+    expect(accRows[0].targetWeight).toBe('100')
   })
 
   it('weights are rounded to nearest 5', () => {

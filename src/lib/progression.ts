@@ -177,7 +177,12 @@ export function generateWorkoutRows(
     const latestSets = historicalSets.filter((r) => r.date === latestDate)
     const numSets = latestSets.length || 1
     const reps = latestSets[0]?.targetReps ?? '10'
-    const weight = config.type === 'bodyweight' ? 'BW' : String(config.trainingMax)
+    const prevWeight = latestSets[0]?.targetWeight
+    const weight = config.type === 'bodyweight'
+      ? 'BW'
+      : prevWeight != null
+        ? String(roundToNearest(Number(prevWeight) + 5, config.roundTo ?? 2.5))
+        : String(config.trainingMax)
     for (let i = 0; i < numSets; i++) {
       result.push({ date: '', routine, exercise, setType, targetReps: reps, targetWeight: weight, actualReps: '' })
     }
