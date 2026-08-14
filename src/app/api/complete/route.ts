@@ -1,14 +1,15 @@
-import { getAllRows, updateCell, getExerciseConfig, getWorkoutState, updateWorkoutState, updateExerciseTrainingMax } from '@/lib/sheets'
-import { getExercisesToSkip } from '@/lib/progression'
+import { getAllRows, updateCell, getExerciseConfig, getWorkoutState, updateExerciseTrainingMax, getSessions, appendSession } from '@/lib/sheets'
+import { deriveNextWeekCycle } from '@/lib/progression'
 
 export async function POST(request: Request) {
   const body = await request.json()
   const { routine } = body as { routine: string }
 
-  const [rows, exerciseConfigs, state] = await Promise.all([
+  const [rows, exerciseConfigs, state, sessions] = await Promise.all([
     getAllRows(),
     getExerciseConfig(),
     getWorkoutState(),
+    getSessions(),
   ])
 
   const pending = rows.filter((row) => row.routine === routine && row.date === '')
@@ -27,49 +28,28 @@ export async function POST(request: Request) {
   }
   await Promise.all(updates)
 
-  // Increment accessory training maxes (bodyweight excluded)
-  const accessoryExercises = [
-    ...new Set(
-      pending
-        .filter((r) => {
-          const key = r.exercise.toLowerCase()
-          const config = exerciseConfigs.get(`${key}::accessory`) ?? exerciseConfigs.get(key)
-          return config?.type === 'accessory'
-        })
-        .map((r) => r.exercise.toLowerCase())
-    ),
-  ]
-  await Promise.all(
-    accessoryExercises.map((exercise) => {
-      const config = exerciseConfigs.get(`${exercise}::accessory`) ?? exerciseConfigs.get(exercise)!
-      return updateExerciseTrainingMax(exercise, config.trainingMax + config.increment, 'accessory')
-    })
-  )
+  const waveLength = state.cyclesBeforeIncrease
+  const { week, cycle } = deriveNextWeekCycle(sessions, routine, waveLength)
 
-  const { currentWeek, currentCycle, cyclesBeforeIncrease, disabledRoutines } = state
+  await appendSession({ date: today, routine, week, cycle })
 
-  if (currentWeek < 3) {
-    await updateWorkoutState(currentWeek + 1)
-    return Response.json({ success: true, deloadPrompt: false })
+  // Increment TMs for this routine's main exercises only at the end of a wave
+  if (week === waveLength) {
+    const mainExercisesInRoutine = [
+      ...new Set(
+        rows
+          .filter((r) => r.routine === routine && r.setType.toLowerCase() === 'main' && r.date !== '')
+          .map((r) => r.exercise.toLowerCase()),
+      ),
+    ]
+    await Promise.all(
+      mainExercisesInRoutine.map((exercise) => {
+        const config = exerciseConfigs.get(`${exercise}::main`) ?? exerciseConfigs.get(exercise)
+        if (!config || config.type !== 'main') return Promise.resolve()
+        return updateExerciseTrainingMax(exercise, config.trainingMax + config.increment, 'main')
+      }),
+    )
   }
 
-  if (currentWeek === 3) {
-    if (currentCycle < cyclesBeforeIncrease) {
-      await updateWorkoutState(1, currentCycle + 1)
-      return Response.json({ success: true, deloadPrompt: false })
-    }
-    return Response.json({ success: true, deloadPrompt: true })
-  }
-
-  // Week 4 (deload) completed: bump non-disabled main TMs and reset to cycle 1 week 1
-  const skipExercises = getExercisesToSkip(rows, disabledRoutines)
-  const mainExercises = [...exerciseConfigs.values()].filter(
-    (c) => c.type === 'main' && !skipExercises.has(c.exercise)
-  )
-  await Promise.all([
-    ...mainExercises.map((c) => updateExerciseTrainingMax(c.exercise, c.trainingMax + c.increment, 'main')),
-    updateWorkoutState(1, 1),
-  ])
-
-  return Response.json({ success: true, deloadPrompt: false })
+  return Response.json({ success: true })
 }
