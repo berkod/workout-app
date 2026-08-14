@@ -59,6 +59,13 @@ export interface WorkoutState {
   program: Program              // supplemental template
 }
 
+export interface SessionEntry {
+  date: string    // ISO date e.g. '2026-08-14'
+  routine: string
+  week: number    // 1–4
+  cycle: number   // 1+
+}
+
 export type EditableColumn = 'targetReps' | 'targetWeight' | 'actualReps'
 
 export const COLUMN_MAP: Record<EditableColumn, string> = {

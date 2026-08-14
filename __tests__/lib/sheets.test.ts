@@ -28,7 +28,8 @@ vi.mock('googleapis', () => {
   }
 })
 
-import { getAllRows, updateCell, getWorkoutState, updateWorkoutState, setRoutineDisabled, setCyclesBeforeIncrease, setProgram, deleteRows } from '@/lib/sheets'
+import { getAllRows, updateCell, getWorkoutState, updateWorkoutState, setRoutineDisabled, setCyclesBeforeIncrease, setProgram, deleteRows, getSessions, appendSession } from '@/lib/sheets'
+import type { SessionEntry } from '@/lib/types'
 
 describe('sheets client', () => {
   let mockGet: ReturnType<typeof vi.fn>
@@ -290,6 +291,54 @@ describe('sheets client', () => {
         },
       }))
       // rowIndex 5 → startIndex 4 (0-based), rowIndex 4 → startIndex 3, rowIndex 3 → startIndex 2
+    })
+  })
+
+  describe('getSessions', () => {
+    it('returns empty array when Sessions tab is missing or empty', async () => {
+      mockGet.mockRejectedValueOnce(new Error('Unable to parse range: Sessions!A:D'))
+      const result = await getSessions()
+      expect(result).toEqual([])
+    })
+
+    it('returns empty array when sheet has only a header row', async () => {
+      mockGet.mockResolvedValueOnce({
+        data: { values: [['Date', 'Routine', 'Week', 'Cycle']] },
+      })
+      const result = await getSessions()
+      expect(result).toEqual([])
+    })
+
+    it('parses and returns session entries skipping header', async () => {
+      mockGet.mockResolvedValueOnce({
+        data: {
+          values: [
+            ['Date', 'Routine', 'Week', 'Cycle'],
+            ['2026-08-01', 'Day 1 – Press BBB', '2', '1'],
+            ['2026-08-03', 'Day 2 – Deadlift BBB', '1', '1'],
+          ],
+        },
+      })
+      const result = await getSessions()
+      expect(result).toEqual<SessionEntry[]>([
+        { date: '2026-08-01', routine: 'Day 1 – Press BBB', week: 2, cycle: 1 },
+        { date: '2026-08-03', routine: 'Day 2 – Deadlift BBB', week: 1, cycle: 1 },
+      ])
+    })
+  })
+
+  describe('appendSession', () => {
+    it('appends a session row to the Sessions tab', async () => {
+      mockAppend.mockResolvedValueOnce({ data: {} })
+      await appendSession({ date: '2026-08-14', routine: 'Day 1 – Press BBB', week: 3, cycle: 1 })
+      expect(mockAppend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          range: 'Sessions!A:D',
+          requestBody: {
+            values: [['2026-08-14', 'Day 1 – Press BBB', '3', '1']],
+          },
+        })
+      )
     })
   })
 })
