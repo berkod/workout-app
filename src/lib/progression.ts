@@ -197,7 +197,7 @@ export function generateWorkoutRows(
 
     let prevWeight: string | undefined
 
-    if (sessions.length > 0) {
+    if (sessions.some((s) => s.routine === routine)) {
       // Sessions data available: look up rows from most recent prior-week session
       const prevWeekDate = prevWeekSessions[0]?.date
       if (prevWeekDate) {

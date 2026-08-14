@@ -552,4 +552,20 @@ describe('generateWorkoutRows — accessory per-week sessions', () => {
     const acc = rows.filter((r) => r.setType === 'accessory')
     expect(acc[0].targetWeight).toBe('55')  // 50 + 5
   })
+
+  it('uses backward compat path when sessions exist for other routines but not this one', () => {
+    // Sessions exist, but only for a different routine (Day 2, not Press Day)
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-01', routine: 'Day 2', week: 2, cycle: 1 },
+    ]
+    const historical = [
+      makeHistoricalRow({ date: '2026-08-01', setType: 'accessory', exercise: 'db_curl', targetReps: '10', targetWeight: '50', actualReps: '10' }),
+    ]
+    const configs = buildConfigMap(makeConfig('db_curl', 100, 'accessory'))
+
+    // Should use backward compat (most recent historical + 5), not fall back to TM
+    const rows = generateWorkoutRows('Press Day', historical, configs, 3, 'BBB', sessions, 1)
+    const acc = rows.filter((r) => r.setType === 'accessory')
+    expect(acc[0].targetWeight).toBe('55')  // 50 + 5, NOT 100 (TM)
+  })
 })
