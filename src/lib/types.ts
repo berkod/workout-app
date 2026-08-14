@@ -26,6 +26,8 @@ export interface WorkoutData {
   routine: string
   groups: SetGroup[]
   isPreview: boolean
+  week: number
+  cycle: number
 }
 
 export interface ExerciseConfig {

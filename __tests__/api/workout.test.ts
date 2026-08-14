@@ -5,12 +5,14 @@ const mockGetAllRows = vi.fn()
 const mockGetExerciseConfig = vi.fn()
 const mockGetWorkoutState = vi.fn()
 const mockAppendRows = vi.fn()
+const mockGetSessions = vi.fn()
 
 vi.mock('@/lib/sheets', () => ({
   getAllRows: (...args: unknown[]) => mockGetAllRows(...args),
   getExerciseConfig: (...args: unknown[]) => mockGetExerciseConfig(...args),
   getWorkoutState: (...args: unknown[]) => mockGetWorkoutState(...args),
   appendRows: (...args: unknown[]) => mockAppendRows(...args),
+  getSessions: (...args: unknown[]) => mockGetSessions(...args),
 }))
 
 import { GET, POST } from '@/app/api/workout/[routine]/route'
@@ -41,6 +43,7 @@ describe('GET /api/workout/[routine]', () => {
     mockGetExerciseConfig.mockResolvedValue(emptyConfig)
     mockGetWorkoutState.mockResolvedValue(defaultState)
     mockAppendRows.mockResolvedValue(undefined)
+    mockGetSessions.mockResolvedValue([])
   })
 
   it('returns pending (empty-date) rows grouped by setType and exercise', async () => {
@@ -125,6 +128,54 @@ describe('GET /api/workout/[routine]', () => {
     // appendRows must NOT have been called
     expect(mockAppendRows).not.toHaveBeenCalled()
   })
+
+  it('returns week:1 cycle:1 when no sessions exist', async () => {
+    mockGetAllRows.mockResolvedValue([
+      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '130', actualReps: '' },
+    ] satisfies SheetRow[])
+    mockGetSessions.mockResolvedValue([])
+
+    const response = await makeGET('Press Day')
+    const data = await response.json()
+
+    expect(data.week).toBe(1)
+    expect(data.cycle).toBe(1)
+  })
+
+  it('derives week and cycle from sessions for pending-row response', async () => {
+    mockGetAllRows.mockResolvedValue([
+      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '130', actualReps: '' },
+    ] satisfies SheetRow[])
+    mockGetSessions.mockResolvedValue([
+      { date: '2026-08-01', routine: 'Press Day', week: 2, cycle: 1 },
+    ])
+
+    const response = await makeGET('Press Day')
+    const data = await response.json()
+
+    expect(data.week).toBe(3)
+    expect(data.cycle).toBe(1)
+  })
+
+  it('preview response includes derived week and cycle', async () => {
+    const config = new Map()
+    config.set('barbell_press::main', { exercise: 'barbell_press', humanReadable: 'Barbell Press', trainingMax: 100, increment: 5, type: 'main', roundTo: 5 })
+    config.set('barbell_press', { exercise: 'barbell_press', humanReadable: 'Barbell Press', trainingMax: 100, increment: 5, type: 'main', roundTo: 5 })
+    mockGetExerciseConfig.mockResolvedValue(config)
+    mockGetAllRows.mockResolvedValue([
+      { rowIndex: 2, date: '2026-08-01', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '65', actualReps: '5' },
+    ] satisfies SheetRow[])
+    mockGetSessions.mockResolvedValue([
+      { date: '2026-08-01', routine: 'Press Day', week: 1, cycle: 1 },
+    ])
+
+    const response = await makeGET('Press Day')
+    const data = await response.json()
+
+    expect(data.isPreview).toBe(true)
+    expect(data.week).toBe(2)
+    expect(data.cycle).toBe(1)
+  })
 })
 
 describe('POST /api/workout/[routine]', () => {
@@ -133,6 +184,7 @@ describe('POST /api/workout/[routine]', () => {
     mockGetExerciseConfig.mockReset().mockResolvedValue(emptyConfig)
     mockGetWorkoutState.mockReset().mockResolvedValue(defaultState)
     mockAppendRows.mockReset().mockResolvedValue(undefined)
+    mockGetSessions.mockReset().mockResolvedValue([])
   })
 
   it('generates and appends rows, returns them with isPreview:false', async () => {

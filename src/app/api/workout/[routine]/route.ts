@@ -1,12 +1,13 @@
-import { getAllRows, appendRows, getExerciseConfig, getWorkoutState } from '@/lib/sheets'
-import { generateWorkoutRows } from '@/lib/progression'
-import type { ExerciseConfig, SetGroup, WorkoutData, SheetRow } from '@/lib/types'
-import type { Week } from '@/lib/progression'
+import { getAllRows, appendRows, getExerciseConfig, getWorkoutState, getSessions } from '@/lib/sheets'
+import { generateWorkoutRows, deriveNextWeekCycle } from '@/lib/progression'
+import type { ExerciseConfig, SetGroup, WorkoutData, SheetRow, Week } from '@/lib/types'
 
 function buildWorkoutData(
   routine: string,
   rows: SheetRow[],
-  exerciseConfigs: Map<string, ExerciseConfig>
+  exerciseConfigs: Map<string, ExerciseConfig>,
+  week: number = 1,
+  cycle: number = 1,
 ): WorkoutData {
   const groups: SetGroup[] = []
   for (const row of rows) {
@@ -28,7 +29,7 @@ function buildWorkoutData(
     }
     group.sets.push(row)
   }
-  return { routine, groups, isPreview: false }
+  return { routine, groups, isPreview: false, week, cycle }
 }
 
 export async function GET(
@@ -38,27 +39,32 @@ export async function GET(
   const { routine } = await params
   const decodedRoutine = decodeURIComponent(routine)
 
-  const [rows, exerciseConfigs] = await Promise.all([getAllRows(), getExerciseConfig()])
+  const [rows, exerciseConfigs, state, sessions] = await Promise.all([
+    getAllRows(),
+    getExerciseConfig(),
+    getWorkoutState(),
+    getSessions(),
+  ])
+
+  const { week, cycle } = deriveNextWeekCycle(sessions, decodedRoutine, state.cyclesBeforeIncrease)
 
   const pending = rows.filter((r) => r.routine === decodedRoutine && r.date === '')
   if (pending.length > 0) {
-    return Response.json(buildWorkoutData(decodedRoutine, pending, exerciseConfigs))
+    return Response.json(buildWorkoutData(decodedRoutine, pending, exerciseConfigs, week, cycle))
   }
 
   const historical = rows.filter((r) => r.routine === decodedRoutine && r.date !== '')
   if (historical.length === 0) {
-    return Response.json({ routine: decodedRoutine, groups: [], isPreview: false })
+    return Response.json({ routine: decodedRoutine, groups: [], isPreview: false, week, cycle })
   }
 
   // No pending rows but history exists — return a preview without writing to the sheet.
   // Negative rowIndices are sentinels: they guarantee unique React keys and signal
   // that these rows have no backing sheet row (onUpdate must not be called).
-  const state = await getWorkoutState()
-  const week = state.currentWeek as Week
-  const previewRows = generateWorkoutRows(decodedRoutine, historical, exerciseConfigs, week, state.program)
+  const previewRows = generateWorkoutRows(decodedRoutine, historical, exerciseConfigs, week as Week, state.program, sessions, cycle)
     .map((r, i): SheetRow => ({ ...r, rowIndex: -(i + 1), date: '', actualReps: '' }))
 
-  const preview = buildWorkoutData(decodedRoutine, previewRows, exerciseConfigs)
+  const preview = buildWorkoutData(decodedRoutine, previewRows, exerciseConfigs, week, cycle)
   return Response.json({ ...preview, isPreview: true })
 }
 
@@ -70,30 +76,35 @@ export async function POST(
   const { routine } = await params
   const decodedRoutine = decodeURIComponent(routine)
 
-  const [rows, exerciseConfigs] = await Promise.all([getAllRows(), getExerciseConfig()])
+  const [rows, exerciseConfigs, state, sessions] = await Promise.all([
+    getAllRows(),
+    getExerciseConfig(),
+    getWorkoutState(),
+    getSessions(),
+  ])
+
+  const { week, cycle } = deriveNextWeekCycle(sessions, decodedRoutine, state.cyclesBeforeIncrease)
 
   // Idempotent: if rows were already generated (e.g., double-tap), return them.
   const existing = rows.filter((r) => r.routine === decodedRoutine && r.date === '')
   if (existing.length > 0) {
-    return Response.json(buildWorkoutData(decodedRoutine, existing, exerciseConfigs))
+    return Response.json(buildWorkoutData(decodedRoutine, existing, exerciseConfigs, week, cycle))
   }
 
   const historical = rows.filter((r) => r.routine === decodedRoutine && r.date !== '')
   if (historical.length === 0) {
-    return Response.json({ routine: decodedRoutine, groups: [], isPreview: false })
+    return Response.json({ routine: decodedRoutine, groups: [], isPreview: false, week, cycle })
   }
 
-  const state = await getWorkoutState()
-  const week = state.currentWeek as Week
-  const newRows = generateWorkoutRows(decodedRoutine, historical, exerciseConfigs, week, state.program)
+  const newRows = generateWorkoutRows(decodedRoutine, historical, exerciseConfigs, week as Week, state.program, sessions, cycle)
 
   if (newRows.length === 0) {
-    return Response.json({ routine: decodedRoutine, groups: [], isPreview: false })
+    return Response.json({ routine: decodedRoutine, groups: [], isPreview: false, week, cycle })
   }
 
   await appendRows(newRows)
   const refreshed = await getAllRows()
   const appended = refreshed.filter((r) => r.routine === decodedRoutine && r.date === '')
 
-  return Response.json(buildWorkoutData(decodedRoutine, appended, exerciseConfigs))
+  return Response.json(buildWorkoutData(decodedRoutine, appended, exerciseConfigs, week, cycle))
 }
