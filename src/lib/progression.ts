@@ -1,4 +1,4 @@
-import type { ExerciseConfig, Program, SheetRow } from './types'
+import type { ExerciseConfig, Program, SessionEntry, SheetRow } from './types'
 
 export type Week = 1 | 2 | 3 | 4
 
@@ -86,12 +86,28 @@ export function roundToNearest(weight: number, increment = 2.5): number {
 // drives what supplemental work gets generated, not what was done in the past.
 const SUPPLEMENTAL_SET_TYPES = new Set(['fsl', 'bbb'])
 
+export function deriveNextWeekCycle(
+  sessions: SessionEntry[],
+  routine: string,
+  waveLength: number,
+): { week: number; cycle: number } {
+  const routineSessions = sessions
+    .filter((s) => s.routine === routine)
+    .sort((a, b) => b.date.localeCompare(a.date))
+  const last = routineSessions[0]
+  if (!last) return { week: 1, cycle: 1 }
+  if (last.week < waveLength) return { week: last.week + 1, cycle: last.cycle }
+  return { week: 1, cycle: last.cycle + 1 }
+}
+
 export function generateWorkoutRows(
   routine: string,
   allHistoricalRows: SheetRow[],
   exerciseConfigs: Map<string, ExerciseConfig>,
   week: Week,
   program: Program = 'FSL',
+  sessions: SessionEntry[] = [],
+  currentCycle: number = 1,
 ): Omit<SheetRow, 'rowIndex'>[] {
   const spec = WEEK_SPEC[week]
   const result: Omit<SheetRow, 'rowIndex'>[] = []
@@ -170,19 +186,56 @@ export function generateWorkoutRows(
     const config = exerciseConfigs.get(`${key}::accessory`) ?? exerciseConfigs.get(key)
     if (!config) continue
 
-    const historicalSets = allHistoricalRows.filter(
-      (r) => r.setType.toLowerCase() === 'accessory' && r.exercise === exercise && r.date !== ''
-    )
-    const latestDate = historicalSets.reduce((max, r) => (r.date > max ? r.date : max), '')
-    const latestSets = historicalSets.filter((r) => r.date === latestDate)
+    // Find previous-week sessions for this routine (earlier cycle or earlier week in same cycle)
+    const prevWeekSessions = sessions
+      .filter(
+        (s) =>
+          s.routine === routine &&
+          (s.cycle < currentCycle || (s.cycle === currentCycle && s.week < week)),
+      )
+      .sort((a, b) => b.date.localeCompare(a.date))
+
+    let prevWeight: string | undefined
+
+    if (sessions.length > 0) {
+      // Sessions data available: look up rows from most recent prior-week session
+      const prevWeekDate = prevWeekSessions[0]?.date
+      if (prevWeekDate) {
+        const prevWeekSets = allHistoricalRows.filter(
+          (r) =>
+            r.setType.toLowerCase() === 'accessory' &&
+            r.exercise === exercise &&
+            r.date === prevWeekDate,
+        )
+        prevWeight = prevWeekSets[0]?.targetWeight
+      }
+      // No prior-week session → prevWeight stays undefined → falls back to TM below
+    } else {
+      // No sessions data: backward compat — use most recent completed session
+      const historicalSets = allHistoricalRows.filter(
+        (r) => r.setType.toLowerCase() === 'accessory' && r.exercise === exercise && r.date !== '',
+      )
+      const latestDate = historicalSets.reduce((max, r) => (r.date > max ? r.date : max), '')
+      const latestSets = historicalSets.filter((r) => r.date === latestDate)
+      prevWeight = latestSets[0]?.targetWeight
+    }
+
+    // Recompute numSets and reps from most recent history regardless of week
+    const recentAccessorySets = allHistoricalRows
+      .filter(
+        (r) => r.setType.toLowerCase() === 'accessory' && r.exercise === exercise && r.date !== '',
+      )
+    const latestDate = recentAccessorySets.reduce((max, r) => (r.date > max ? r.date : max), '')
+    const latestSets = recentAccessorySets.filter((r) => r.date === latestDate)
     const numSets = latestSets.length || 1
     const reps = latestSets[0]?.targetReps ?? '10'
-    const prevWeight = latestSets[0]?.targetWeight
-    const weight = config.type === 'bodyweight'
-      ? 'BW'
-      : prevWeight != null
-        ? String(roundToNearest(Number(prevWeight) + 5, config.roundTo ?? 2.5))
-        : String(config.trainingMax)
+
+    const weight =
+      config.type === 'bodyweight'
+        ? 'BW'
+        : prevWeight !== undefined
+          ? String(roundToNearest(Number(prevWeight) + 5, config.roundTo ?? 2.5))
+          : String(config.trainingMax)
     for (let i = 0; i < numSets; i++) {
       result.push({ date: '', routine, exercise, setType, targetReps: reps, targetWeight: weight, actualReps: '' })
     }

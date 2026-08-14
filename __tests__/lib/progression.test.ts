@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { roundToNearest, generateWorkoutRows, WEEK_SPEC, getExercisesToSkip } from '@/lib/progression'
+import { roundToNearest, generateWorkoutRows, WEEK_SPEC, getExercisesToSkip, deriveNextWeekCycle } from '@/lib/progression'
 import type { ExerciseConfig, SheetRow } from '@/lib/types'
+import type { SessionEntry } from '@/lib/types'
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -441,5 +442,114 @@ describe('getExercisesToSkip', () => {
     ]
     const result = getExercisesToSkip(rows, ['Day 2 - RDL', 'Day 4 - Squat'])
     expect(result).toEqual(new Set(['rdl', 'squat']))
+  })
+})
+
+describe('deriveNextWeekCycle', () => {
+  it('returns week 1 cycle 1 when no sessions exist for the routine', () => {
+    expect(deriveNextWeekCycle([], 'Day 1', 3)).toEqual({ week: 1, cycle: 1 })
+  })
+
+  it('ignores sessions for other routines', () => {
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-01', routine: 'Day 2', week: 3, cycle: 1 },
+    ]
+    expect(deriveNextWeekCycle(sessions, 'Day 1', 3)).toEqual({ week: 1, cycle: 1 })
+  })
+
+  it('advances week within wave (waveLength=3)', () => {
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-01', routine: 'Day 1', week: 1, cycle: 1 },
+    ]
+    expect(deriveNextWeekCycle(sessions, 'Day 1', 3)).toEqual({ week: 2, cycle: 1 })
+  })
+
+  it('rolls to week 1 and bumps cycle after last week of wave (waveLength=3)', () => {
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-14', routine: 'Day 1', week: 3, cycle: 1 },
+    ]
+    expect(deriveNextWeekCycle(sessions, 'Day 1', 3)).toEqual({ week: 1, cycle: 2 })
+  })
+
+  it('advances to week 4 (deload) when waveLength=4 and last was week 3', () => {
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-14', routine: 'Day 1', week: 3, cycle: 2 },
+    ]
+    expect(deriveNextWeekCycle(sessions, 'Day 1', 4)).toEqual({ week: 4, cycle: 2 })
+  })
+
+  it('rolls to week 1 and bumps cycle after deload (waveLength=4)', () => {
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-14', routine: 'Day 1', week: 4, cycle: 1 },
+    ]
+    expect(deriveNextWeekCycle(sessions, 'Day 1', 4)).toEqual({ week: 1, cycle: 2 })
+  })
+
+  it('uses the most recent session when multiple exist', () => {
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-01', routine: 'Day 1', week: 1, cycle: 1 },
+      { date: '2026-08-08', routine: 'Day 1', week: 2, cycle: 1 },
+    ]
+    expect(deriveNextWeekCycle(sessions, 'Day 1', 3)).toEqual({ week: 3, cycle: 1 })
+  })
+})
+
+describe('generateWorkoutRows — accessory per-week sessions', () => {
+  it('uses prior-week session targetWeight + 5 when sessions data available', () => {
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-01', routine: 'Press Day', week: 2, cycle: 1 },
+    ]
+    const historical = [
+      makeHistoricalRow({ date: '2026-08-01', setType: 'accessory', exercise: 'db_curl', targetReps: '10', targetWeight: '50', actualReps: '10' }),
+    ]
+    const configs = buildConfigMap(makeConfig('db_curl', 100, 'accessory'))
+
+    // Generating week 3, cycle 1 → prior week = week 2, cycle 1 → date 2026-08-01 → weight 50+5
+    const rows = generateWorkoutRows('Press Day', historical, configs, 3, 'BBB', sessions, 1)
+    const acc = rows.filter((r) => r.setType === 'accessory')
+    expect(acc[0].targetWeight).toBe('55')
+  })
+
+  it('falls back to trainingMax when sessions exist but no prior-week session for this routine', () => {
+    // The only session IS week 3 cycle 1 (same as what we are generating), so no prior-week
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-01', routine: 'Press Day', week: 3, cycle: 1 },
+    ]
+    const historical = [
+      makeHistoricalRow({ date: '2026-08-01', setType: 'accessory', exercise: 'db_curl', targetReps: '10', targetWeight: '50', actualReps: '10' }),
+    ]
+    const configs = buildConfigMap(makeConfig('db_curl', 45, 'accessory'))
+
+    const rows = generateWorkoutRows('Press Day', historical, configs, 3, 'BBB', sessions, 1)
+    const acc = rows.filter((r) => r.setType === 'accessory')
+    expect(acc[0].targetWeight).toBe('45')  // TM fallback
+  })
+
+  it('uses prior-cycle session when current week 1 of new cycle', () => {
+    // Last session was week 3, cycle 1. Now generating week 1, cycle 2.
+    const sessions: SessionEntry[] = [
+      { date: '2026-08-14', routine: 'Press Day', week: 3, cycle: 1 },
+    ]
+    const historical = [
+      makeHistoricalRow({ date: '2026-08-14', setType: 'accessory', exercise: 'db_curl', targetReps: '10', targetWeight: '60', actualReps: '10' }),
+    ]
+    const configs = buildConfigMap(makeConfig('db_curl', 100, 'accessory'))
+
+    // Generating week 1, cycle 2 → prior = cycle 1 (any week) → week 3 date → weight 60+5
+    const rows = generateWorkoutRows('Press Day', historical, configs, 1, 'BBB', sessions, 2)
+    const acc = rows.filter((r) => r.setType === 'accessory')
+    expect(acc[0].targetWeight).toBe('65')
+  })
+
+  it('backward compat: no sessions → uses most recent historical + 5', () => {
+    const historical = [
+      makeHistoricalRow({ date: '2026-08-01', setType: 'accessory', exercise: 'db_curl', targetReps: '10', targetWeight: '50', actualReps: '10' }),
+    ]
+    const configs = buildConfigMap(makeConfig('db_curl', 100, 'accessory'))
+
+    // sessions=[] → backward compat path
+    const rows = generateWorkoutRows('Press Day', historical, configs, 3, 'BBB', [], 1)
+    const acc = rows.filter((r) => r.setType === 'accessory')
+    expect(acc[0].targetWeight).toBe('55')  // 50 + 5
   })
 })
