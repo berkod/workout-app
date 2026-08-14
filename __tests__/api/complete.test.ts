@@ -1,30 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { ExerciseConfig, SheetRow, WorkoutState } from '@/lib/types'
+import type { ExerciseConfig, SheetRow, WorkoutState, SessionEntry } from '@/lib/types'
 
 const mockGetAllRows = vi.fn()
 const mockUpdateCell = vi.fn()
 const mockGetExerciseConfig = vi.fn()
 const mockGetWorkoutState = vi.fn()
-const mockUpdateWorkoutState = vi.fn()
 const mockUpdateExerciseTrainingMax = vi.fn()
+const mockGetSessions = vi.fn()
+const mockAppendSession = vi.fn()
 
 vi.mock('@/lib/sheets', () => ({
   getAllRows: (...args: unknown[]) => mockGetAllRows(...args),
   updateCell: (...args: unknown[]) => mockUpdateCell(...args),
   getExerciseConfig: (...args: unknown[]) => mockGetExerciseConfig(...args),
   getWorkoutState: (...args: unknown[]) => mockGetWorkoutState(...args),
-  updateWorkoutState: (...args: unknown[]) => mockUpdateWorkoutState(...args),
   updateExerciseTrainingMax: (...args: unknown[]) => mockUpdateExerciseTrainingMax(...args),
+  getSessions: (...args: unknown[]) => mockGetSessions(...args),
+  appendSession: (...args: unknown[]) => mockAppendSession(...args),
 }))
 
 import { POST } from '@/app/api/complete/route'
 
-function makePostRequest(body: object) {
+function makePostRequest(routine: string) {
   return POST(
     new Request('http://localhost/api/complete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ routine }),
     })
   )
 }
@@ -32,7 +34,10 @@ function makePostRequest(body: object) {
 function makeConfig(entries: Array<[string, Partial<ExerciseConfig>]>): Map<string, ExerciseConfig> {
   const map = new Map<string, ExerciseConfig>()
   for (const [key, partial] of entries) {
-    const config: ExerciseConfig = { exercise: key, humanReadable: key, trainingMax: 100, increment: 5, type: 'main', roundTo: 2.5, equipment: 'barbell', ...partial }
+    const config: ExerciseConfig = {
+      exercise: key, humanReadable: key, trainingMax: 100, increment: 5,
+      type: 'main', roundTo: 2.5, equipment: 'barbell', ...partial,
+    }
     map.set(key, config)
     const compoundType = config.type === 'bodyweight' ? 'accessory' : config.type
     map.set(`${key}::${compoundType}`, config)
@@ -40,176 +45,139 @@ function makeConfig(entries: Array<[string, Partial<ExerciseConfig>]>): Map<stri
   return map
 }
 
-const emptyConfig = new Map()
+const defaultState: WorkoutState = {
+  currentWeek: 1, currentCycle: 1, cyclesBeforeIncrease: 3,
+  disabledRoutines: [], program: 'BBB',
+}
+
+const pressRow: SheetRow = {
+  rowIndex: 3, date: '', routine: 'Press Day', setType: 'main',
+  exercise: 'barbell_press', targetReps: '5', targetWeight: '130', actualReps: '5',
+}
+const pressHistorical: SheetRow = {
+  rowIndex: 2, date: '2026-08-01', routine: 'Press Day', setType: 'main',
+  exercise: 'barbell_press', targetReps: '5', targetWeight: '100', actualReps: '5',
+}
 
 describe('POST /api/complete', () => {
   beforeEach(() => {
-    mockGetAllRows.mockReset()
+    mockGetAllRows.mockReset().mockResolvedValue([])
     mockUpdateCell.mockReset().mockResolvedValue(undefined)
-    mockGetExerciseConfig.mockReset().mockResolvedValue(emptyConfig)
-    mockGetWorkoutState.mockReset().mockResolvedValue({
-      currentWeek: 1, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: [],
-    } satisfies WorkoutState)
-    mockUpdateWorkoutState.mockReset().mockResolvedValue(undefined)
+    mockGetExerciseConfig.mockReset().mockResolvedValue(new Map())
+    mockGetWorkoutState.mockReset().mockResolvedValue(defaultState)
     mockUpdateExerciseTrainingMax.mockReset().mockResolvedValue(undefined)
+    mockGetSessions.mockReset().mockResolvedValue([])
+    mockAppendSession.mockReset().mockResolvedValue(undefined)
   })
 
-  it('stamps date and fills empty actualReps only for pending rows of the routine', async () => {
+  it('returns error when no pending rows found for routine', async () => {
     mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'warm-up', exercise: 'barbell_press', targetReps: '5', targetWeight: '80', actualReps: '5' },
-      { rowIndex: 3, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '130', actualReps: '' },
-      { rowIndex: 4, date: '', routine: 'Squat Day', setType: 'main', exercise: 'back_squat', targetReps: '5', targetWeight: '185', actualReps: '' },
-    ] satisfies SheetRow[])
-
-    await makePostRequest({ routine: 'Press Day' })
-
-    // Both Press Day rows get a date stamp
-    expect(mockUpdateCell).toHaveBeenCalledWith(2, 'A', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
-    expect(mockUpdateCell).toHaveBeenCalledWith(3, 'A', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
-    // Row 3 had empty actualReps — gets filled with '0'
-    expect(mockUpdateCell).toHaveBeenCalledWith(3, 'G', '0')
-    // Squat Day row untouched
-    expect(mockUpdateCell).not.toHaveBeenCalledWith(4, expect.anything(), expect.anything())
-  })
-
-  it('does not touch already-completed (dated) rows', async () => {
-    mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '2026-03-01', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '130', actualReps: '6' },
-      { rowIndex: 3, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '140', actualReps: '' },
-    ] satisfies SheetRow[])
-
-    await makePostRequest({ routine: 'Press Day' })
-
-    expect(mockUpdateCell).not.toHaveBeenCalledWith(2, expect.anything(), expect.anything())
-    expect(mockUpdateCell).toHaveBeenCalledWith(3, 'A', expect.any(String))
-  })
-
-  it('returns deloadPrompt:false and advances to week 2 after completing week 1', async () => {
-    mockGetWorkoutState.mockResolvedValue({ currentWeek: 1 })
-    mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '130', actualReps: '5' },
-    ] satisfies SheetRow[])
-
-    const res = await makePostRequest({ routine: 'Press Day' })
+      { ...pressRow, date: '2026-08-14' },  // already dated — not pending
+    ])
+    const res = await makePostRequest('Press Day')
     const data = await res.json()
-
-    expect(data.deloadPrompt).toBe(false)
-    expect(mockUpdateWorkoutState).toHaveBeenCalledWith(2)
-  })
-
-  it('returns deloadPrompt:true and does not advance week after completing week 3', async () => {
-    mockGetWorkoutState.mockResolvedValue({
-      currentWeek: 3, currentCycle: 3, cyclesBeforeIncrease: 3, disabledRoutines: [],
-    } satisfies WorkoutState)
-    mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '1+', targetWeight: '155', actualReps: '3' },
-    ] satisfies SheetRow[])
-
-    const res = await makePostRequest({ routine: 'Press Day' })
-    const data = await res.json()
-
-    expect(data.deloadPrompt).toBe(true)
-    expect(mockUpdateWorkoutState).not.toHaveBeenCalled()
-  })
-
-  it('increments main TMs and resets to week 1 after completing week 4 (deload)', async () => {
-    mockGetWorkoutState.mockResolvedValue({
-      currentWeek: 4, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: [],
-    } satisfies WorkoutState)
-    mockGetExerciseConfig.mockResolvedValue(makeConfig([
-      ['barbell_press', { trainingMax: 165, increment: 5, type: 'main' }],
-      ['back_squat', { trainingMax: 275, increment: 10, type: 'main' }],
-    ]))
-    mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '65', actualReps: '5' },
-    ] satisfies SheetRow[])
-
-    await makePostRequest({ routine: 'Press Day' })
-
-    expect(mockUpdateExerciseTrainingMax).toHaveBeenCalledWith('barbell_press', 170, 'main')
-    expect(mockUpdateExerciseTrainingMax).toHaveBeenCalledWith('back_squat', 285, 'main')
-    expect(mockUpdateWorkoutState).toHaveBeenCalledWith(1, 1)
-  })
-
-  it('increments accessory training max on completion', async () => {
-    mockGetWorkoutState.mockResolvedValue({ currentWeek: 1 })
-    mockGetExerciseConfig.mockResolvedValue(makeConfig([
-      ['pullups', { trainingMax: 0, increment: 0, type: 'bodyweight' }],
-      ['db_bench_press', { trainingMax: 50, increment: 5, type: 'accessory' }],
-    ]))
-    mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'accessory', exercise: 'db_bench_press', targetReps: '10', targetWeight: '50', actualReps: '10' },
-      { rowIndex: 3, date: '', routine: 'Press Day', setType: 'accessory', exercise: 'pullups', targetReps: '8', targetWeight: 'BW', actualReps: '8' },
-    ] satisfies SheetRow[])
-
-    await makePostRequest({ routine: 'Press Day' })
-
-    // Accessory incremented
-    expect(mockUpdateExerciseTrainingMax).toHaveBeenCalledWith('db_bench_press', 55, 'accessory')
-    // Bodyweight NOT incremented
-    expect(mockUpdateExerciseTrainingMax).not.toHaveBeenCalledWith('pullups', expect.anything(), expect.anything())
-  })
-
-  it('returns error when no pending rows found', async () => {
-    mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '2026-03-01', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '130', actualReps: '5' },
-    ] satisfies SheetRow[])
-
-    const res = await makePostRequest({ routine: 'Press Day' })
-    const data = await res.json()
-
     expect(data.success).toBe(false)
     expect(mockUpdateCell).not.toHaveBeenCalled()
   })
 
-  it('silently resets to week 1 and increments cycle when week 3 completes but cycle < cyclesBeforeIncrease', async () => {
-    mockGetWorkoutState.mockResolvedValue({
-      currentWeek: 3, currentCycle: 2, cyclesBeforeIncrease: 3, disabledRoutines: [],
-    } satisfies WorkoutState)
-    mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '1+', targetWeight: '155', actualReps: '3' },
-    ] satisfies SheetRow[])
+  it('stamps today as date on all pending rows of the routine', async () => {
+    mockGetAllRows.mockResolvedValue([pressRow])
+    await makePostRequest('Press Day')
+    expect(mockUpdateCell).toHaveBeenCalledWith(3, 'A', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
+  })
 
-    const res = await makePostRequest({ routine: 'Press Day' })
+  it('fills empty actualReps with 0', async () => {
+    mockGetAllRows.mockResolvedValue([{ ...pressRow, actualReps: '' }])
+    await makePostRequest('Press Day')
+    expect(mockUpdateCell).toHaveBeenCalledWith(3, 'G', '0')
+  })
+
+  it('does not touch pending rows of other routines', async () => {
+    const squatRow: SheetRow = { rowIndex: 4, date: '', routine: 'Squat Day', setType: 'main', exercise: 'back_squat', targetReps: '5', targetWeight: '130', actualReps: '' }
+    mockGetAllRows.mockResolvedValue([pressRow, squatRow])
+    await makePostRequest('Press Day')
+    expect(mockUpdateCell).not.toHaveBeenCalledWith(4, expect.anything(), expect.anything())
+  })
+
+  it('writes a session entry with the derived week and cycle', async () => {
+    mockGetAllRows.mockResolvedValue([pressRow, pressHistorical])
+    mockGetSessions.mockResolvedValue([
+      { date: '2026-08-01', routine: 'Press Day', week: 2, cycle: 1 } satisfies SessionEntry,
+    ])
+    await makePostRequest('Press Day')
+    expect(mockAppendSession).toHaveBeenCalledWith(
+      expect.objectContaining({ routine: 'Press Day', week: 3, cycle: 1 })
+    )
+  })
+
+  it('writes week 1 cycle 1 session when no prior sessions exist', async () => {
+    mockGetAllRows.mockResolvedValue([pressRow])
+    mockGetSessions.mockResolvedValue([])
+    await makePostRequest('Press Day')
+    expect(mockAppendSession).toHaveBeenCalledWith(
+      expect.objectContaining({ routine: 'Press Day', week: 1, cycle: 1 })
+    )
+  })
+
+  it('returns success:true with no deloadPrompt field', async () => {
+    mockGetAllRows.mockResolvedValue([pressRow])
+    const res = await makePostRequest('Press Day')
     const data = await res.json()
+    expect(data.success).toBe(true)
+    expect(data).not.toHaveProperty('deloadPrompt')
+  })
 
-    expect(data.deloadPrompt).toBe(false)
-    expect(mockUpdateWorkoutState).toHaveBeenCalledWith(1, 3)
+  it('does not update TM when completing a mid-wave week', async () => {
+    // waveLength=3, last session was week 1 → completing week 2 (not last)
+    mockGetAllRows.mockResolvedValue([pressRow, pressHistorical])
+    mockGetSessions.mockResolvedValue([
+      { date: '2026-08-01', routine: 'Press Day', week: 1, cycle: 1 } satisfies SessionEntry,
+    ])
+    await makePostRequest('Press Day')
     expect(mockUpdateExerciseTrainingMax).not.toHaveBeenCalled()
   })
 
-  it('shows deload prompt when week 3 completes and currentCycle === cyclesBeforeIncrease', async () => {
-    mockGetWorkoutState.mockResolvedValue({
-      currentWeek: 3, currentCycle: 3, cyclesBeforeIncrease: 3, disabledRoutines: [],
-    } satisfies WorkoutState)
+  it('increments only this routine main exercise TMs at end of wave (waveLength=3)', async () => {
+    const config = makeConfig([
+      ['barbell_press', { trainingMax: 200, increment: 5, type: 'main' }],
+      ['back_squat', { trainingMax: 160, increment: 10, type: 'main' }],
+    ])
+    mockGetExerciseConfig.mockResolvedValue(config)
     mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '1+', targetWeight: '155', actualReps: '3' },
-    ] satisfies SheetRow[])
-
-    const res = await makePostRequest({ routine: 'Press Day' })
-    const data = await res.json()
-
-    expect(data.deloadPrompt).toBe(true)
-    expect(mockUpdateWorkoutState).not.toHaveBeenCalled()
+      pressRow,
+      pressHistorical,
+      // Squat belongs to a different routine
+      { rowIndex: 5, date: '2026-08-01', routine: 'Squat Day', setType: 'main', exercise: 'back_squat', targetReps: '5', targetWeight: '130', actualReps: '5' },
+    ])
+    // waveLength=3, last session was week 2 → completing week 3 = end of wave
+    mockGetSessions.mockResolvedValue([
+      { date: '2026-08-01', routine: 'Press Day', week: 2, cycle: 1 } satisfies SessionEntry,
+    ])
+    await makePostRequest('Press Day')
+    expect(mockUpdateExerciseTrainingMax).toHaveBeenCalledWith('barbell_press', 205, 'main')
+    expect(mockUpdateExerciseTrainingMax).not.toHaveBeenCalledWith('back_squat', expect.anything(), expect.anything())
   })
 
-  it('skips TM bump for exercises that only appear in disabled routines after week 4', async () => {
-    mockGetWorkoutState.mockResolvedValue({
-      currentWeek: 4, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: ['Day 2 - RDL'],
-    } satisfies WorkoutState)
-    mockGetExerciseConfig.mockResolvedValue(makeConfig([
-      ['barbell_press', { trainingMax: 165, increment: 5, type: 'main' }],
-      ['rdl', { trainingMax: 225, increment: 10, type: 'main' }],
-    ]))
+  it('increments TM at end of deload week when waveLength=4', async () => {
+    mockGetWorkoutState.mockResolvedValue({ ...defaultState, cyclesBeforeIncrease: 4 })
+    const config = makeConfig([['barbell_press', { trainingMax: 200, increment: 5, type: 'main' }]])
+    mockGetExerciseConfig.mockResolvedValue(config)
+    mockGetAllRows.mockResolvedValue([pressRow, pressHistorical])
+    // Last session was week 3 → completing week 4 (deload) = end of wave
+    mockGetSessions.mockResolvedValue([
+      { date: '2026-08-01', routine: 'Press Day', week: 3, cycle: 1 } satisfies SessionEntry,
+    ])
+    await makePostRequest('Press Day')
+    expect(mockUpdateExerciseTrainingMax).toHaveBeenCalledWith('barbell_press', 205, 'main')
+  })
+
+  it('does not update accessory training maxes', async () => {
+    const config = makeConfig([['db_curl', { trainingMax: 40, increment: 5, type: 'accessory' }]])
+    mockGetExerciseConfig.mockResolvedValue(config)
     mockGetAllRows.mockResolvedValue([
-      { rowIndex: 2, date: '', routine: 'Press Day', setType: 'main', exercise: 'barbell_press', targetReps: '5', targetWeight: '65', actualReps: '5' },
-      { rowIndex: 3, date: '2026-03-01', routine: 'Day 2 - RDL', setType: 'main', exercise: 'rdl', targetReps: '5', targetWeight: '145', actualReps: '5' },
-    ] satisfies SheetRow[])
-
-    await makePostRequest({ routine: 'Press Day' })
-
-    expect(mockUpdateExerciseTrainingMax).toHaveBeenCalledWith('barbell_press', 170, 'main')
-    expect(mockUpdateExerciseTrainingMax).not.toHaveBeenCalledWith('rdl', expect.anything(), expect.anything())
-    expect(mockUpdateWorkoutState).toHaveBeenCalledWith(1, 1)
+      { rowIndex: 3, date: '', routine: 'Press Day', setType: 'accessory', exercise: 'db_curl', targetReps: '12', targetWeight: '40', actualReps: '12' },
+    ])
+    await makePostRequest('Press Day')
+    expect(mockUpdateExerciseTrainingMax).not.toHaveBeenCalled()
   })
 })

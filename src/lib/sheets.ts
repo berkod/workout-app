@@ -1,5 +1,5 @@
 import { google } from 'googleapis'
-import type { EquipmentConfig, ExerciseConfig, PlateEntry, Program, SheetRow, WorkoutState } from './types'
+import type { EquipmentConfig, ExerciseConfig, PlateEntry, Program, SessionEntry, SheetRow, WorkoutState } from './types'
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID ?? ''
 const SHEET_NAME = 'Sheet1'
@@ -313,5 +313,37 @@ export async function updateCell(
     range: `${SHEET_NAME}!${column}${row}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [[value]] },
+  })
+}
+
+export async function getSessions(): Promise<SessionEntry[]> {
+  try {
+    const sheets = getSheets()
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: 'Sessions!A:D',
+    })
+    const values = response.data.values
+    if (!values || values.length <= 1) return []
+    return values.slice(1).map((row) => ({
+      date: row[0] || '',
+      routine: row[1] || '',
+      week: Number(row[2]) || 1,
+      cycle: Number(row[3]) || 1,
+    }))
+  } catch {
+    return []
+  }
+}
+
+export async function appendSession(entry: SessionEntry): Promise<void> {
+  const sheets = getSheets()
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: 'Sessions!A:D',
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [[entry.date, entry.routine, String(entry.week), String(entry.cycle)]],
+    },
   })
 }

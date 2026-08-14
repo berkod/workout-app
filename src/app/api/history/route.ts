@@ -35,7 +35,7 @@ export async function GET() {
 
   for (const [key, exerciseRows] of byKey) {
     const config = configs.get(key)
-    if (!config) continue
+    if (!config || config.type === 'bodyweight') continue
 
     // Group rows by date → one session per day
     const byDate = new Map<string, SheetRow[]>()

@@ -26,6 +26,8 @@ export interface WorkoutData {
   routine: string
   groups: SetGroup[]
   isPreview: boolean
+  week: number
+  cycle: number
 }
 
 export interface ExerciseConfig {
@@ -57,6 +59,13 @@ export interface WorkoutState {
   cyclesBeforeIncrease: number  // 3 or 4
   disabledRoutines: string[]    // routine names currently disabled
   program: Program              // supplemental template
+}
+
+export interface SessionEntry {
+  date: string    // ISO date e.g. '2026-08-14'
+  routine: string
+  week: number    // 1–4
+  cycle: number   // 1+
 }
 
 export type EditableColumn = 'targetReps' | 'targetWeight' | 'actualReps'
