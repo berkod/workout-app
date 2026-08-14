@@ -132,7 +132,7 @@ export default function SettingsPage() {
         <section>
           <h2 className="text-base font-semibold text-fall-rust mb-3">Progression</h2>
           <div className="rounded-lg border border-fall-wheat bg-white p-4 shadow-sm">
-            <p className="text-sm font-medium text-fall-bark mb-3">Cycles before TM increase</p>
+            <p className="text-sm font-medium text-fall-bark mb-3">Weeks per cycle</p>
             <div className="flex gap-3">
               {([3, 4] as const).map((n) => (
                 <button
@@ -145,7 +145,7 @@ export default function SettingsPage() {
                       : 'border-fall-wheat text-fall-bark-light'
                   }`}
                 >
-                  {n} cycles
+                  {n} weeks
                 </button>
               ))}
             </div>
