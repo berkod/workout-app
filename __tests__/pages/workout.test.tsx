@@ -17,6 +17,8 @@ import WorkoutPage from '@/app/workout/[routine]/page'
 const mockWorkoutData: WorkoutData = {
   routine: 'A: Press',
   isPreview: false,
+  week: 2,
+  cycle: 1,
   groups: [
     {
       setType: 'warm-up',
@@ -42,6 +44,8 @@ const mockWorkoutData: WorkoutData = {
 const mockPreviewData: WorkoutData = {
   routine: 'A: Press',
   isPreview: true,
+  week: 3,
+  cycle: 1,
   groups: [
     {
       setType: 'warm-up',
@@ -171,5 +175,20 @@ describe('Workout page', () => {
       expect(screen.getByRole('button', { name: /complete workout/i })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /start workout/i })).not.toBeInTheDocument()
     })
+  })
+
+  it('displays week and cycle as subtitle', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => mockWorkoutData })
+    render(<WorkoutPage />)
+    await screen.findByText('A: Press')
+    expect(screen.getByText('Week 2 · Cycle 1')).toBeInTheDocument()
+  })
+
+  it('does not render a deload modal', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => mockWorkoutData })
+    render(<WorkoutPage />)
+    await screen.findByText('A: Press')
+    expect(screen.queryByText(/3 Weeks Complete/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Do Deload Week/i)).not.toBeInTheDocument()
   })
 })
