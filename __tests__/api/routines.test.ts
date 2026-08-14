@@ -12,7 +12,7 @@ vi.mock('@/lib/sheets', () => ({
 import { GET } from '@/app/api/routines/route'
 
 const defaultState: WorkoutState = {
-  currentWeek: 1, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: [],
+  currentWeek: 1, currentCycle: 1, cyclesBeforeIncrease: 3, disabledRoutines: [], program: 'FSL',
 }
 
 describe('GET /api/routines', () => {

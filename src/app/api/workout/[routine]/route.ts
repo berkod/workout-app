@@ -1,6 +1,7 @@
 import { getAllRows, appendRows, getExerciseConfig, getWorkoutState, getSessions } from '@/lib/sheets'
 import { generateWorkoutRows, deriveNextWeekCycle } from '@/lib/progression'
-import type { ExerciseConfig, SetGroup, WorkoutData, SheetRow, Week } from '@/lib/types'
+import type { Week } from '@/lib/progression'
+import type { ExerciseConfig, SetGroup, WorkoutData, SheetRow } from '@/lib/types'
 
 function buildWorkoutData(
   routine: string,
